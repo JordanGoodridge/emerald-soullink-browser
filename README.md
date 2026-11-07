@@ -4,6 +4,10 @@ Play 2–4 player Emerald SoulLink and Nuzlocke runs in the browser on top of [`
 
 This repo only contains the multiplayer server, browser UI, and a patch (`patches/pokeemerald-wasm.patch`). The game files are downloaded from `pokeemerald-wasm` when you run `.\install.ps1`.
 
+<p align="center">
+  <a href="docs/screenshots/overworld-coop.jpg"><img src="docs/screenshots/overworld-coop.jpg" alt="3D Multiplayer Overworld in Littleroot Town" width="680"></a>
+</p>
+
 ---
 
 ## Features
@@ -21,6 +25,10 @@ This repo only contains the multiplayer server, browser UI, and a patch (`patche
 - **Shared Deaths:** If one player's mon faints in battle or from poison, all mons linked to it across every player's party and PC are automatically deleted after the battle. Revives are disabled on dead mons.
 - **Linked PC Lock:** You can't box a linked party member unless the lobby host turns on independent PC boxing.
 - **Party Wipes & Run Morgue:** If any player's active party wipes, the whole group wipes (mons sitting in the PC don't save you). Ending a run by wiping or beating the Champion shows a summary screen with your Gym split times, Hall of Fame team, and a **Run Morgue** of every death and who caused it.
+
+| Live Party & SoulLink Bonds | Route & Encounter Tracker | Group Wipe & Superlatives |
+| :---: | :---: | :---: |
+| <a href="docs/screenshots/soullink-party.jpg"><img src="docs/screenshots/soullink-party.jpg" alt="Party and SoulLink Bonds" height="190"></a> | <a href="docs/screenshots/run-tracker.jpg"><img src="docs/screenshots/run-tracker.jpg" alt="SoulLink Run Tracker" height="190"></a> | <a href="docs/screenshots/group-wipe.jpg"><img src="docs/screenshots/group-wipe.jpg" alt="Group Wipe Summary and Superlatives" height="190"></a> |
 
 ### Randomizer, Level Caps & QoL Toggles
 - **Randomizer:** Shared seed across all players. Separate toggles for wild encounters, regular trainers, Gym Leaders / Elite Four / Champion, and starters.
