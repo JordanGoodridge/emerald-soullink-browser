@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "game": {
+    "id": "test-emerald",
+    "title": "Test Emerald",
+    "packVersion": "0.0.0",
+    "revision": "architecture fixture"
+  },
+  "build": {
+    "source": "synthetic:emerald-reference",
+    "sourceRevision": "synthetic-1",
+    "recipe": "reuse build/wasm/pokeemerald.wasm",
+    "toolchain": "same as emerald",
+    "artifact": "build/wasm/pokeemerald.wasm"
+  },
+  "runtime": {
+    "kind": "source-wasm",
+    "adapter": "adapter/runtime.mjs",
+    "abiVersion": 1,
+    "module": {
+      "id": "wasm",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": false,
+      "url": "/build/wasm/pokeemerald.wasm",
+      "sha256": "pending",
+      "mediaType": "application/wasm",
+      "bytes": 268435456
+    },
+    "entry": ["AgbMain", "WasmRunFrame"],
+    "initialMemoryBytes": 268435456,
+    "requiredExports": ["memory", "AgbMain", "WasmRunFrame", "WasmDisplayBuffer", "WasmDisplayBufferSize", "WasmRenderFrame"],
+    "optionalExports": ["WasmRenderHd2dFrame", "WasmDisplaySceneKind", "WasmPresenceValid"]
+  },
+  "rendering": {
+    "modes": ["hd2d", "classic"],
+    "defaultMode": "hd2d",
+    "sceneFormat": "emerald-scene-v1",
+    "width": 240,
+    "height": 160,
+    "adapter": "adapter/scene.mjs"
+  },
+  "resources": [
+    {
+      "id": "wasm",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": false,
+      "url": "/build/wasm/pokeemerald.wasm",
+      "sha256": "pending",
+      "mediaType": "application/wasm",
+      "bytes": 268435456
+    },
+    {
+      "id": "avatar.brendan",
+      "kind": "avatar",
+      "group": "presence",
+      "embedded": false,
+      "url": "/graphics/object_events/pics/people/brendan/walking.png",
+      "sha256": "pending",
+      "mediaType": "image/png"
+    },
+    {
+      "id": "avatar.may",
+      "kind": "avatar",
+      "group": "presence",
+      "embedded": false,
+      "url": "/graphics/object_events/pics/people/may/walking.png",
+      "sha256": "pending",
+      "mediaType": "image/png"
+    }
+  ],
+  "saves": {
+    "formatId": "test-emerald-flash-128k",
+    "formatVersion": 1,
+    "bytes": 131072,
+    "codec": "adapter/saves.mjs",
+    "exportName": "test-emerald.sav"
+  },
+  "multiplayer": {
+    "protocol": 2,
+    "contentVersion": "test-emerald-presence-v1",
+    "adapter": "adapter/world.mjs",
+    "worldIdentity": ["mapGroup", "mapNum", "layoutId", "variant"],
+    "instanceSupport": "secret-base instances are unsupported",
+    "avatars": [
+      {
+        "appearance": "brendan.on-foot",
+        "resource": "avatar.brendan",
+        "transparent": [115, 197, 164],
+        "cellWidth": 16,
+        "cellHeight": 32,
+        "frames": 9
+      },
+      {
+        "appearance": "may.on-foot",
+        "resource": "avatar.may",
+        "transparent": [115, 197, 164],
+        "cellWidth": 16,
+        "cellHeight": 32,
+        "frames": 9
+      }
+    ]
+  },
+  "nuzlocke": {
+    "support": "none"
+  },
+  "interiorSupport": "unsupported",
+  "capabilities": {
+    "rendering": ["hd2d", "classic"],
+    "presence": "readonly",
+    "rules": "none",
+    "link": "none",
+    "customUi": false
+  },
+  "verification": {
+    "evidence": ["game-packs/test-emerald/README.md"]
+  }
+}

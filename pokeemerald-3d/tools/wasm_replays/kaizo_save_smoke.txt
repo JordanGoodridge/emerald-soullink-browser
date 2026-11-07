@@ -1,0 +1,5 @@
+# Emerald Kaizo save smoke: start a new game, warp, save in-game, then capture.
+0 new-game
+120 warp 0 18 10 8
+240 save
+520 screenshot kaizo-after-save

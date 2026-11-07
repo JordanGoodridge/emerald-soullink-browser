@@ -1,0 +1,5 @@
+/* Modular stylesheet entrypoint — see ./styles/ for focused domain files. */
+@import url("./styles/base-shell.css");
+@import url("./styles/presence-and-dialogs-base.css");
+@import url("./styles/overworld-overlays.css");
+@import url("./styles/sheets-and-map.css");

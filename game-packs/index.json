@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "default": "emerald",
+  "games": [
+    {
+      "id": "emerald",
+      "title": "Emerald",
+      "packVersion": "0.1.0",
+      "manifest": "emerald/manifest.json",
+      "cover": "emerald/cover.png",
+      "summary": "The reference pokeemerald-3d build.",
+      "capabilities": {
+        "rendering": ["hd2d", "classic"],
+        "presence": "readonly",
+        "rules": "enforce",
+        "link": "none",
+        "customUi": false
+      }
+    },
+    {
+      "id": "emerald-kaizo",
+      "title": "Emerald Kaizo",
+      "packVersion": "0.1.0",
+      "manifest": "emerald-kaizo/manifest.json",
+      "cover": "emerald-kaizo/cover.png",
+      "summary": "SinisterHoodedFigure's difficulty hack, reconstructed in source and merged into the PokeTech WASM tree.",
+      "capabilities": {
+        "rendering": ["hd2d", "classic"],
+        "presence": "readonly",
+        "rules": "none",
+        "link": "none",
+        "customUi": false
+      }
+    },
+    {
+      "id": "test-classic",
+      "title": "Test Classic",
+      "packVersion": "0.0.0",
+      "manifest": "test-classic/manifest.json",
+      "summary": "Hidden capability fixture: classic-only, no presence.",
+      "hidden": true,
+      "capabilities": {
+        "rendering": ["classic"],
+        "presence": "none",
+        "rules": "none",
+        "link": "none",
+        "customUi": false
+      }
+    },
+    {
+      "id": "test-emerald",
+      "title": "Test Emerald",
+      "packVersion": "0.0.0",
+      "manifest": "test-emerald/manifest.json",
+      "summary": "Hidden architecture fixture. Boots the reference module with a separate save namespace.",
+      "hidden": true,
+      "capabilities": {
+        "rendering": ["hd2d", "classic"],
+        "presence": "readonly",
+        "rules": "none",
+        "link": "none",
+        "customUi": false
+      }
+    },
+    {
+      "id": "toy-console",
+      "title": "Toy Console (architecture fixture)",
+      "packVersion": "0.0.0",
+      "manifest": "toy-console/manifest.json",
+      "summary": "Hidden, minimal non-Emerald runtime fixture for adapter and browser-shell conformance.",
+      "hidden": true,
+      "capabilities": {
+        "rendering": ["classic"],
+        "presence": "none",
+        "rules": "none",
+        "link": "none",
+        "customUi": false
+      }
+    }
+  ]
+}

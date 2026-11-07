@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 1,
+  "game": {
+    "id": "emerald",
+    "title": "Emerald",
+    "packVersion": "0.1.0",
+    "revision": "pokeemerald-3d 6fa044e"
+  },
+  "build": {
+    "source": "https://github.com/tripplyons/pokeemerald-3d",
+    "sourceRevision": "6fa044ec5e8b948ed764ebdb80e5f2b6ce917e1c",
+    "recipe": "make wasm",
+    "toolchain": "clang wasm32-unknown-unknown + MSYS2 UCRT64",
+    "artifact": "build/wasm/pokeemerald.wasm"
+  },
+  "runtime": {
+    "kind": "source-wasm",
+    "adapter": "adapter/runtime.mjs",
+    "abiVersion": 1,
+    "module": {
+      "id": "wasm",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": false,
+      "url": "/build/wasm/pokeemerald.wasm",
+      "sha256": "pending",
+      "mediaType": "application/wasm",
+      "bytes": 268435456
+    },
+    "entry": ["AgbMain", "WasmRunFrame"],
+    "initialMemoryBytes": 268435456,
+    "requiredExports": [
+      "memory",
+      "AgbMain",
+      "WasmRunFrame",
+      "WasmDisplayBuffer",
+      "WasmDisplayBufferSize",
+      "WasmRenderFrame",
+      "WasmRenderHd2dFrame",
+      "WasmDisplaySceneKind",
+      "WasmSetHd2dEnabled",
+      "WasmRefreshHd2dObjectEvents",
+      "WasmWorldBuffer",
+      "WasmWorldBufferSize",
+      "WasmWorldHeightBuffer",
+      "WasmWorldHeightBufferSize",
+      "WasmWorldGroundHeightBuffer",
+      "WasmWorldGroundHeightBufferSize",
+      "WasmWorldGeometryBuffer",
+      "WasmWorldGeometryBufferSize",
+      "WasmWorldReceiverBuffer",
+      "WasmWorldReceiverBufferSize",
+      "WasmWorldFacadeBuffer",
+      "WasmWorldFacadeBufferSize",
+      "WasmWorldWidth",
+      "WasmWorldHeight",
+      "WasmWorldGridOffsetX",
+      "WasmWorldGridOffsetY",
+      "WasmWorldPixelOriginX",
+      "WasmWorldPixelOriginY"
+    ],
+    "optionalExports": [
+      "WasmPresenceValid",
+      "WasmPresenceRefresh",
+      "WasmPresenceMapGroup",
+      "WasmPresenceMapNum",
+      "WasmPresenceMapLayoutId",
+      "WasmPresenceMapType",
+      "WasmPresenceActivity",
+      "WasmPresenceFieldKind",
+      "WasmPresenceXPx",
+      "WasmPresenceYPx",
+      "WasmPresenceElevation",
+      "WasmPresenceJumpPx",
+      "WasmPresenceScreenX",
+      "WasmPresenceScreenY",
+      "WasmPresenceFacing",
+      "WasmPresenceMotion",
+      "WasmPresenceGender",
+      "WasmPresenceAnimCmdIndex",
+      "WasmPresenceSpritePriority",
+      "WasmRunPartyMove",
+      "WasmRunRelearnableMoveCount",
+      "WasmRunRelearnableMoveAt",
+      "WasmRunSetPartyMove",
+      "WasmRunLoadBaseSave",
+      "WasmRunReplaceStarter",
+      "WasmRunGetMoney",
+      "WasmRunSetMoney",
+      "WasmRunIsChampion",
+      "WasmAudioSampleRate",
+      "WasmAudioAvailableFrames",
+      "WasmAudioBufferPtr",
+      "WasmAudioConsumeFrames"
+    ]
+  },
+  "rendering": {
+    "modes": ["hd2d", "classic"],
+    "defaultMode": "hd2d",
+    "sceneFormat": "emerald-scene-v1",
+    "width": 240,
+    "height": 160,
+    "adapter": "adapter/scene.mjs"
+  },
+  "resources": [
+    {
+      "id": "wasm",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": false,
+      "url": "/build/wasm/pokeemerald.wasm",
+      "sha256": "pending",
+      "mediaType": "application/wasm",
+      "bytes": 268435456
+    },
+    {
+      "id": "map-names",
+      "kind": "data",
+      "group": "boot",
+      "embedded": false,
+      "url": "dist/map-names.json",
+      "sha256": "pending",
+      "mediaType": "application/json"
+    },
+    {
+      "id": "region-map",
+      "kind": "data",
+      "group": "optional",
+      "embedded": false,
+      "url": "dist/region-map.json",
+      "sha256": "pending",
+      "mediaType": "application/json"
+    },
+    {
+      "id": "region-map-art",
+      "kind": "image",
+      "group": "optional",
+      "embedded": false,
+      "url": "resources/hoenn-region-map.png",
+      "sha256": "pending",
+      "mediaType": "image/png",
+      "bytes": 85798
+    },
+    {
+      "id": "soullink-base-save",
+      "kind": "data",
+      "group": "optional",
+      "embedded": false,
+      "url": "resources/soullink-base.sav",
+      "sha256": "pending",
+      "mediaType": "application/octet-stream",
+      "bytes": 131072
+    },
+    {
+      "id": "avatar.brendan",
+      "kind": "avatar",
+      "group": "presence",
+      "embedded": false,
+      "url": "/graphics/object_events/pics/people/brendan/walking.png",
+      "sha256": "pending",
+      "mediaType": "image/png"
+    },
+    {
+      "id": "avatar.may",
+      "kind": "avatar",
+      "group": "presence",
+      "embedded": false,
+      "url": "/graphics/object_events/pics/people/may/walking.png",
+      "sha256": "pending",
+      "mediaType": "image/png"
+    }
+  ],
+  "saves": {
+    "formatId": "emerald-flash-128k",
+    "formatVersion": 1,
+    "bytes": 131072,
+    "codec": "adapter/saves.mjs",
+    "exportName": "pokeemerald.sav",
+    "legacyStorageKeys": ["pokeemerald.wasm.flash.v1"]
+  },
+  "multiplayer": {
+    "protocol": 2,
+    "contentVersion": "emerald-presence-v2",
+    "adapter": "adapter/world.mjs",
+    "worldIdentity": ["mapGroup", "mapNum", "layoutId", "variant"],
+    "instanceSupport": "secret-base instances are unsupported",
+    "avatars": [
+      {
+        "appearance": "brendan.on-foot",
+        "resource": "avatar.brendan",
+        "transparent": [115, 197, 164],
+        "cellWidth": 16,
+        "cellHeight": 32,
+        "frames": 9
+      },
+      {
+        "appearance": "may.on-foot",
+        "resource": "avatar.may",
+        "transparent": [115, 197, 164],
+        "cellWidth": 16,
+        "cellHeight": 32,
+        "frames": 9
+      }
+    ]
+  },
+  "nuzlocke": {
+    "support": "enforce",
+    "adapter": "adapter/rules.mjs",
+    "areas": "region-map",
+    "clauses": {
+      "nicknameRequired": false
+    },
+    "requiredHooks": ["encounter", "captureGate", "faintRelease", "reviveGate"]
+  },
+  "run": {
+    "adapter": "adapter/run.mjs",
+    "support": "enforce",
+    "modes": ["nuzlocke", "soullink"],
+    "regionMapResource": "region-map",
+    "quickStartBaseResource": "soullink-base-save",
+    "capabilities": {
+      "encounter": "enforce",
+      "captureGate": "enforce",
+      "faintRelease": "enforce",
+      "reviveGate": "enforce",
+      "linkedPcBoxing": "enforce",
+      "quickStart": "table",
+      "tracker": "map-data",
+      "randomizer": {
+        "wild": true,
+        "trainers": true,
+        "gyms": true,
+        "starters": true
+      }
+    }
+  },
+  "party": {
+    "adapter": "adapter/party.mjs"
+  },
+  "interiorSupport": "unsupported",
+  "capabilities": {
+    "rendering": ["hd2d", "classic"],
+    "presence": "readonly",
+    "rules": "enforce",
+    "link": "none",
+    "customUi": false
+  },
+  "verification": {
+    "evidence": [
+      "game-packs/emerald/README.md"
+    ]
+  }
+}

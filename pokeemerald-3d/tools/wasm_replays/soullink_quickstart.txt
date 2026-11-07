@@ -1,0 +1,9 @@
+# Smoke-test the Emerald run quick-start from a blank flash save.
+# Species 382 is Kyogre and verifies unrestricted legendary starter acceptance.
+0 new-game
+120 quickstart 382 2
+320 screenshot soullink-route101
+320 probe state
+320 probe run-party
+320 probe run-save
+320 probe run-gym-caps

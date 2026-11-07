@@ -1,0 +1,2 @@
+# Preserve file bytes exactly; this tree contains game data parsers sensitive to line endings.
+* -text

@@ -1,0 +1,1050 @@
+/* The in-game friends panel shares the same pixel frame and light interface. */
+
+#presence-toggle {
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: var(--frame-ivory);
+  box-shadow: 0 3px 0 #b8b99b;
+  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
+}
+
+#presence-toggle:hover,
+#presence-toggle:focus-visible,
+#presence-toggle[aria-expanded="true"] {
+  color: var(--frame-navy);
+  background: var(--lib-mint);
+}
+
+#presence-toggle:focus-visible {
+  outline: 2px solid var(--frame-navy);
+  outline-offset: 3px;
+}
+
+#presence-panel.themed-panel {
+  top: 66px;
+  right: clamp(10px, 2vw, 24px);
+  width: min(460px, calc(100vw - 20px));
+  max-width: calc(100vw - 20px);
+  max-height: min(70dvh, 620px);
+  padding: 7px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: var(--frame-navy);
+  box-shadow: none;
+  filter: drop-shadow(0 3px 0 rgb(21 37 64 / 38%));
+}
+
+#presence-panel > .presence-panel-content {
+  display: grid;
+  gap: 12px;
+  max-height: min(calc(70dvh - 14px), 606px);
+  overflow-y: auto;
+  padding: clamp(14px, 2.4vw, 20px);
+  color: var(--frame-navy);
+  letter-spacing: -.01em;
+}
+
+#presence-panel .presence-head {
+  align-items: center;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #c6cbbf;
+}
+
+#presence-panel .presence-head h2 {
+  color: var(--frame-navy);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+#presence-panel .presence-status {
+  color: #70798a;
+  font-size: 16px;
+}
+
+#presence-panel .presence-status.error {
+  color: var(--lib-error);
+}
+
+#presence-panel #presence-close {
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: var(--lib-gold);
+  box-shadow: 0 3px 0 var(--lib-gold-shadow);
+  font-size: 16px;
+}
+
+#presence-panel .presence-fields {
+  gap: 8px;
+}
+
+#presence-panel .presence-fields label {
+  color: var(--frame-navy);
+  font-size: 16px;
+}
+
+#presence-panel .presence-fields input {
+  min-height: 40px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  font-size: 16px;
+}
+
+#presence-panel .presence-fields input::placeholder {
+  color: #70798a;
+  opacity: 1;
+}
+
+#presence-panel .presence-fields input:focus-visible {
+  outline-color: var(--lib-green);
+}
+
+#presence-panel .presence-actions {
+  gap: 6px;
+}
+
+#presence-panel .presence-actions button {
+  min-height: 38px;
+  padding: 5px 8px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  box-shadow: 0 3px 0 #b8b99b;
+  font-size: 16px;
+}
+
+#presence-panel #presence-create {
+  color: #fffdf1;
+  background: var(--lib-green);
+  box-shadow: 0 3px 0 var(--lib-green-shadow);
+}
+
+#presence-panel #presence-leave:disabled {
+  color: #70798a;
+  background: #e4e5d7;
+  box-shadow: 0 3px 0 #c6cbbf;
+  opacity: 1;
+}
+
+#presence-panel .presence-actions button:hover:not(:disabled),
+#presence-panel .presence-actions button:focus-visible,
+#presence-panel #presence-close:hover,
+#presence-panel #presence-close:focus-visible {
+  filter: brightness(1.06);
+  outline: 2px solid var(--lib-green);
+  outline-offset: 2px;
+}
+
+#presence-panel .presence-room-code {
+  color: var(--lib-green);
+  font-size: 20px;
+  letter-spacing: .08em;
+}
+
+#presence-panel .presence-roster {
+  gap: 4px;
+}
+
+#presence-panel .presence-roster li {
+  padding: 8px 10px;
+  border: 1px solid #d7dac8;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #f1f1df;
+  font-size: 16px;
+}
+
+#presence-panel .presence-roster li span {
+  color: #70798a;
+}
+
+#presence-panel .presence-roster .presence-empty {
+  justify-content: center;
+  border-style: dashed;
+  color: #70798a;
+  background: transparent;
+}
+
+#presence-panel .presence-hint {
+  border: 1px solid #d7c376;
+  border-left: 4px solid var(--lib-gold-shadow);
+  color: var(--frame-navy);
+  background: #fff2c9;
+  font-size: 15px;
+}
+
+#presence-panel .presence-note {
+  color: #70798a;
+  font-size: 14px;
+}
+
+#presence-panel .presence-run-settings {
+  color: var(--frame-navy);
+  border-color: #c6cbbf;
+}
+
+#presence-panel .presence-run-settings legend {
+  color: var(--lib-green);
+}
+
+#presence-panel .presence-run-options label {
+  color: var(--frame-navy);
+}
+
+#presence-panel .presence-run-options input {
+  accent-color: var(--lib-green);
+}
+
+#presence-panel .soullink-run-choice,
+#presence-panel .soullink-saved-lobbies {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 2px solid #c6cbbf;
+  color: var(--frame-navy);
+  background: #f1f1df;
+}
+
+#presence-panel .soullink-run-choice h3,
+#presence-panel .soullink-saved-lobbies h3 {
+  color: var(--lib-green);
+  font-size: 18px;
+}
+
+#presence-panel .soullink-run-choice-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#presence-panel .soullink-run-choice-actions button {
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#presence-panel .soullink-run-choice-actions button:hover,
+#presence-panel .soullink-run-choice-actions button:focus-visible {
+  outline: 2px solid var(--lib-green);
+  outline-offset: 2px;
+}
+
+#presence-panel .soullink-saved-lobbies > .presence-note {
+  color: var(--frame-navy);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+#presence-panel .soullink-saved-lobby-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+#presence-panel .soullink-saved-lobby-info {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: var(--frame-navy);
+  overflow-wrap: anywhere;
+}
+
+#presence-panel .soullink-saved-lobby-info small {
+  display: block;
+  color: #596578;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+#presence-panel .soullink-saved-lobby-item > button {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 5px 10px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  box-shadow: 0 3px 0 #b8b99b;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+#presence-panel .soullink-saved-lobby-item > .saved-lobby-delete {
+  color: #782e2a;
+  background: #f4d8d0;
+}
+
+#presence-panel .soullink-saved-lobby-item > button:hover,
+#presence-panel .soullink-saved-lobby-item > button:focus-visible {
+  filter: brightness(1.04);
+  outline: 2px solid var(--lib-green);
+  outline-offset: 2px;
+}
+
+#presence-panel .soullink-saved-lobby-item > button:disabled {
+  opacity: .65;
+  cursor: default;
+}
+
+#presence-panel .presence-lobby-save {
+  gap: 10px;
+  padding: 12px;
+  border: 2px solid #c6cbbf;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #f1f1df;
+}
+
+#presence-panel .presence-lobby-save h3 {
+  color: var(--lib-green);
+  font-size: 18px;
+}
+
+#presence-panel .presence-lobby-save > .presence-note {
+  color: var(--frame-navy);
+  font-size: 15px;
+  line-height: 1.4;
+  opacity: 1;
+  overflow-wrap: anywhere;
+}
+
+#presence-panel .presence-lobby-save .presence-actions {
+  align-items: center;
+  gap: 8px;
+}
+
+#presence-panel .lobby-more-options {
+  flex-basis: 100%;
+  color: var(--frame-navy);
+  font-size: 15px;
+}
+
+#presence-panel .lobby-more-options summary {
+  width: fit-content;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--lib-green);
+  font-weight: 700;
+}
+
+#presence-panel .lobby-more-options[open] {
+  display: grid;
+  gap: 8px;
+}
+
+#presence-panel .lobby-slot-claim {
+  gap: 8px;
+  color: var(--frame-navy);
+  font-size: 15px;
+}
+
+#presence-panel .lobby-slot-claim select {
+  min-height: 38px;
+  padding: 5px 8px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  font: inherit;
+}
+
+#presence-panel [hidden] {
+  display: none !important;
+}
+
+.run-notice {
+  position: absolute;
+  z-index: 20;
+  right: clamp(8px, 2vw, 20px);
+  bottom: clamp(8px, 2vw, 20px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: min(520px, calc(100% - 16px));
+  padding: 12px 14px;
+  border: 3px solid #153d35;
+  color: #163b32;
+  background: #fff9db;
+  box-shadow: 4px 4px 0 rgb(9 25 20 / 45%);
+  font-family: var(--font-body, system-ui, sans-serif);
+}
+
+.run-notice[hidden] { display: none !important; }
+.run-notice > div { display: grid; gap: 3px; min-width: 0; }
+.run-notice strong { font-size: 15px; }
+.run-notice span { font-size: 13px; line-height: 1.35; }
+.run-notice button {
+  min-height: 36px;
+  padding: 5px 9px;
+  border: 2px solid #153d35;
+  color: #fff9db;
+  background: #23664f;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.run-notice #run-notice-dismiss { min-width: 34px; color: #163b32; background: transparent; font-size: 20px; }
+.run-notice button:focus-visible { outline: 3px solid #bc5b35; outline-offset: 2px; }
+
+.run-tracker-dialog { width: min(680px, calc(100vw - 24px)); max-width: calc(100vw - 24px); }
+.run-tracker-dialog h2 { color: var(--frame-navy); }
+.run-tracker-dialog #run-tracker-summary { color: #586879; }
+.run-tracker-form { display: grid; gap: 16px; max-height: min(88dvh, 760px); overflow: auto; }
+.run-tracker-form > header { position: sticky; top: 0; z-index: 1; padding: 4px 0 10px; background: var(--lib-bg); }
+.run-tracker-section { display: grid; gap: 8px; }
+.run-tracker-section h3 { margin: 0; color: var(--frame-navy); }
+.run-tracker-current { margin: 0; padding: 9px 11px; border-left: 5px solid var(--frame-navy); color: var(--frame-navy); background: #f1f2dc; font-weight: 700; }
+.run-tracker-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.run-tracker-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 9px 11px; border: 1px solid #c6cbbf; color: var(--frame-navy); background: #fffdf1; }
+.run-tracker-list > li > strong { overflow-wrap: anywhere; }
+.run-tracker-list > li > span { text-align: right; font-size: 13px; }
+.run-tracker-list > li > small { grid-column: 1 / -1; color: #586879; }
+.run-tracker-list > li[data-status="available"] { border-left: 5px solid var(--frame-navy); }
+.run-tracker-list > li[data-status="pending"] { border-left: 5px solid #cc9b28; }
+.run-tracker-list > li[data-status="void"], .run-tracker-list > li[data-status="dead"] { border-left: 5px solid #b64c3f; }
+.run-tracker-empty { color: #586879 !important; }
+
+@media (max-width: 560px) {
+  .run-notice { grid-template-columns: minmax(0, 1fr) auto; }
+  .run-notice #run-notice-dismiss { position: absolute; top: 2px; right: 2px; border: 0; }
+  .run-notice > div { padding-right: 22px; }
+  .run-tracker-list > li { grid-template-columns: 1fr; }
+  .run-tracker-list > li > span { text-align: left; }
+}
+
+@media (max-width: 560px) {
+  #save-profile-dialog > .save-profile-form,
+  #party-panel > .party-panel-form {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  #save-profile-dialog .presence-roster li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #save-profile-dialog .save-profile-state {
+    grid-column: 1;
+    text-align: left;
+  }
+
+  #presence-panel.themed-panel {
+    top: 58px;
+    right: 8px;
+  }
+
+  #presence-panel .presence-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* SoulLink starts in a focused room lobby; the game canvas/title screen stays
+   out of the way until each player has selected a starter. */
+body[data-soul-link-pregame="true"] {
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 15% 12%, #d8e8cc 0 12rem, transparent 34rem),
+    radial-gradient(circle at 90% 88%, #d7e4c8 0 18rem, transparent 36rem),
+    var(--lib-bg);
+}
+
+body[data-soul-link-pregame="true"] #play-shell > :not(.ambient):not(#presence-panel):not(#starter-choice-dialog[open]):not(#group-wipe-dialog[open]) {
+  display: none !important;
+}
+
+body[data-soul-link-pregame="true"] #presence-toggle {
+  display: none !important;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel.themed-panel {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  width: min(760px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 7px;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel[hidden] {
+  display: none;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel:not([hidden]) {
+  display: grid;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel > .presence-panel-content {
+  width: 100%;
+  max-height: calc(100dvh - 46px);
+  padding: clamp(16px, 3vw, 28px);
+  overflow: auto;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel #presence-close {
+  display: none;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel .presence-roster li span,
+body[data-soul-link-pregame="true"] #presence-panel .presence-hint {
+  display: none !important;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel[data-status="joined"] .presence-fields,
+body[data-soul-link-pregame="true"] #presence-panel[data-status="joined"] #presence-create,
+body[data-soul-link-pregame="true"] #presence-panel[data-status="joined"] #presence-join,
+body[data-soul-link-pregame="true"] #presence-panel > .presence-panel-content > .presence-note:last-child {
+  display: none !important;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel[data-status="joined"] > .presence-panel-content > .presence-actions {
+  display: none !important;
+}
+
+body[data-soul-link-pregame="true"] #presence-default-head {
+  display: none !important;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel .soul-link-pregame-header h2 {
+  color: var(--frame-navy);
+  font-size: clamp(24px, 4vw, 34px);
+}
+
+body[data-soul-link-pregame="true"] #presence-panel .soul-link-pregame-header .presence-note {
+  max-width: 48ch;
+  margin-top: 8px;
+  color: var(--lib-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel #soul-link-pregame-status {
+  color: var(--lib-green);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel #presence-run-settings-note {
+  font-size: 13px;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel #soul-link-pregame-back {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px 10px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  box-shadow: 0 3px 0 #b8b99b;
+  font-size: 15px;
+}
+
+body[data-soul-link-pregame="true"] #presence-panel #run-start {
+  justify-self: stretch;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+  border: 2px solid var(--lib-green-shadow);
+  border-radius: 0;
+  color: #fffdf1;
+  background: var(--lib-green);
+  box-shadow: 0 4px 0 var(--lib-green-shadow);
+  font-size: 18px;
+}
+
+@media (max-width: 560px) {
+  body[data-soul-link-pregame="true"] #presence-panel.themed-panel {
+    top: 50%;
+    right: auto;
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  body[data-soul-link-pregame="true"] #presence-panel > .presence-panel-content {
+    max-height: calc(100dvh - 34px);
+    padding: 14px;
+  }
+
+  body[data-soul-link-pregame="true"] #presence-panel .soul-link-pregame-header {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+/* Standard Play shares the focused lobby surface, but can start offline with
+   one member. Its settings summary stays mode-safe and never shows SoulLink rules. */
+body[data-standard-lobby="true"] {
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 15% 12%, #d8e8cc 0 12rem, transparent 34rem),
+    radial-gradient(circle at 90% 88%, #d7e4c8 0 18rem, transparent 36rem),
+    var(--lib-bg);
+}
+
+body[data-standard-lobby="true"] #play-shell > :not(.ambient):not(#presence-panel) {
+  display: none !important;
+}
+
+body[data-standard-lobby="true"] #presence-toggle,
+body[data-standard-lobby="true"] #presence-default-head,
+body[data-standard-lobby="true"] #presence-close {
+  display: none !important;
+}
+
+body[data-standard-lobby="true"] #presence-panel.themed-panel {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  width: min(760px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 7px;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+}
+
+body[data-standard-lobby="true"] #presence-panel[hidden] { display: none; }
+body[data-standard-lobby="true"] #presence-panel:not([hidden]) { display: grid; }
+
+body[data-standard-lobby="true"] #presence-panel > .presence-panel-content {
+  width: 100%;
+  max-height: calc(100dvh - 46px);
+  padding: clamp(16px, 3vw, 28px);
+  overflow: auto;
+}
+
+body[data-standard-lobby="true"] #presence-panel .standard-lobby-header {
+  align-items: start;
+}
+
+body[data-standard-lobby="true"] #presence-panel .standard-lobby-header h2 {
+  color: var(--frame-navy);
+  font-size: clamp(24px, 4vw, 34px);
+}
+
+body[data-standard-lobby="true"] #presence-panel .standard-lobby-header .presence-note,
+body[data-standard-lobby="true"] #presence-panel #standard-lobby-status {
+  max-width: 54ch;
+  margin-top: 8px;
+  color: var(--lib-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body[data-standard-lobby="true"] #presence-panel #standard-lobby-back,
+body[data-standard-lobby="true"] #presence-panel #standard-lobby-cancel-resume {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px 10px;
+  border: 2px solid var(--frame-navy);
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: #fffdf1;
+  box-shadow: 0 3px 0 #b8b99b;
+  font-size: 14px;
+}
+
+body[data-standard-lobby="true"] #presence-panel .standard-lobby-settings {
+  margin: 12px 0;
+  padding: 14px;
+  border: 2px solid var(--frame-navy);
+  color: var(--frame-navy);
+  background: #f8f5e8;
+}
+
+body[data-standard-lobby="true"] #presence-panel .standard-lobby-settings legend {
+  padding: 0 7px;
+  color: var(--frame-navy);
+  font-weight: 800;
+}
+
+.standard-lobby-settings dl { display: grid; gap: 8px; margin: 4px 0 12px; }
+.standard-lobby-settings dl > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
+.standard-lobby-settings dt { color: var(--lib-green); font-weight: 800; }
+.standard-lobby-settings dd { margin: 0; color: var(--frame-navy); }
+
+body[data-standard-lobby="true"] #presence-panel #standard-lobby-start {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  border: 2px solid var(--lib-green-shadow);
+  border-radius: 0;
+  color: #fffdf1;
+  background: var(--lib-green);
+  box-shadow: 0 4px 0 var(--lib-green-shadow);
+  font-size: 18px;
+}
+
+body[data-standard-lobby="true"] #presence-panel #standard-lobby-start:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+body[data-standard-lobby="true"] #presence-panel[data-status="joined"] .presence-fields,
+body[data-standard-lobby="true"] #presence-panel[data-status="joined"] #presence-create,
+body[data-standard-lobby="true"] #presence-panel[data-status="joined"] #presence-join {
+  display: none !important;
+}
+
+@media (max-width: 560px) {
+  body[data-standard-lobby="true"] #presence-panel.themed-panel {
+    top: 50%;
+    right: auto;
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  body[data-standard-lobby="true"] #presence-panel > .presence-panel-content {
+    max-height: calc(100dvh - 34px);
+    padding: 14px;
+  }
+  body[data-standard-lobby="true"] #presence-panel .standard-lobby-header {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 900px) {
+  .library-hero-content {
+    grid-template-columns: 1fr;
+  }
+
+  .library-hero-cover {
+    border-right: 0;
+    border-bottom: 2px solid var(--frame-navy);
+    border-radius: 0;
+    aspect-ratio: 2 / 1;
+  }
+}
+
+/* Pre-paint boot mode: avoid a library/play background flash before app.js runs. */
+
+html[data-boot="play"] #library {
+  display: none !important;
+}
+
+html[data-boot="play"] body {
+  display: grid;
+  background: #07110f;
+  color: var(--text);
+}
+
+html[data-boot="library"] #play-shell {
+  display: none !important;
+}
+
+html[data-boot="library"] body {
+  display: block;
+  background-color: var(--lib-bg);
+  color: var(--lib-ink);
+}
+
+/* HUD and game menu match the framed dialogue box in the reference. */
+
+.speed-hud.pixel-frame {
+  width: 92px;
+  height: 44px;
+  padding: 7px;
+  display: block;
+  background: var(--frame-navy);
+  filter: none;
+}
+
+.speed-hud > .pixel-frame-content {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 24px 0 9px;
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background-color: var(--frame-ivory);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23152540' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  box-shadow: none;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+}
+
+.hud-menu-button.pixel-frame {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 6px;
+  border: 0;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: var(--frame-navy);
+  box-shadow: none;
+  filter: none;
+}
+
+.hud-menu-button > .pixel-frame-content {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--frame-navy);
+  background: var(--frame-ivory);
+}
+
+.hud-menu-button > .pixel-frame-content svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hud-menu-button[aria-expanded="true"] > .pixel-frame-content {
+  color: var(--frame-ivory);
+  background: var(--lib-green);
+}
+
+#game-menu.game-menu {
+  position: fixed;
+  inset: auto;
+  width: min(336px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  margin: 0;
+  padding: 7px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: var(--frame-navy);
+  box-shadow: none;
+  filter: drop-shadow(0 2px 0 rgb(21 37 64 / 24%));
+}
+
+#game-menu > .game-menu-body {
+  max-height: calc(100dvh - 30px);
+  overflow-y: auto;
+  padding: 10px 12px 8px;
+  color: var(--frame-navy);
+  background: var(--frame-ivory);
+  letter-spacing: -.015em;
+}
+
+#game-menu .game-menu-head {
+  min-height: 28px;
+  padding: 0 8px 7px;
+  border: 0;
+}
+
+#game-menu .game-menu-head h2 {
+  color: #70798a;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+#game-menu .game-menu-head .icon-button {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+}
+
+#game-menu .game-menu-actions {
+  display: grid;
+  gap: 1px;
+}
+
+#game-menu .game-menu-actions button {
+  width: calc(100% - 4px);
+  min-height: 46px;
+  margin-inline: 2px;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 38px 16px;
+  align-items: center;
+  column-gap: 8px;
+  border: 0;
+  border-radius: 0;
+  color: var(--frame-navy);
+  background: transparent;
+  box-shadow: none;
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+  text-align: left;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+#game-menu .game-menu-actions button:hover,
+#game-menu .game-menu-actions button:focus-visible {
+  color: var(--frame-navy);
+  background: var(--lib-mint);
+  outline: 0;
+}
+
+#game-menu .game-menu-actions button:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--frame-navy);
+}
+
+#game-menu .menu-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--frame-navy);
+}
+
+#game-menu .menu-icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#game-menu .menu-label {
+  min-width: 0;
+  grid-column: 2;
+  margin-left: 18px;
+  color: var(--frame-navy);
+  white-space: nowrap;
+}
+
+#game-menu .game-menu-actions kbd,
+#game-menu .game-menu-actions .menu-arrow {
+  grid-column: 3;
+  justify-self: end;
+  margin: 0;
+  color: var(--frame-navy);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+#game-menu .game-menu-actions kbd {
+  padding: 4px 6px;
+  border: 1px solid #d8d8cd;
+  background: var(--frame-ivory);
+}
+
+#game-menu .game-menu-actions .menu-arrow {
+  grid-column: 4;
+  font-size: 24px;
+  line-height: .8;
+}
+
+#game-menu #game-menu-change {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #c6cbbf;
+}
+
+#game-menu .game-menu-footer {
+  margin-top: 7px;
+  padding: 8px 8px 1px;
+  border-top: 1px solid #c6cbbf;
+  color: #70798a;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+/* Initial library loader: a quiet Poké Ball rock, then a clean reveal. */
+
+.emerald-loading {
+  transition: opacity 160ms ease-out;
+}
+
+.emerald-loading.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loader-content {
+  padding: 24px;
+  text-align: center;
+}
+
+.pokeball {
+  width: 96px;
+  height: 96px;
+  display: block;
+  margin: 0 auto 26px;
+  image-rendering: pixelated;
+  transform-origin: 50% 90%;
+  animation: emerald-ball-rock 2.8s ease-in-out infinite;
+}
+
+.loader-label {
+  margin: 0;
+  color: var(--frame-navy);
+  font-family: "Emerald Menu Pixel", ui-monospace, monospace;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+@keyframes emerald-ball-rock {
+  0%, 12%, 52%, 100% { transform: rotate(0deg); }
+  22% { transform: rotate(-8deg); }
+  33% { transform: rotate(7deg); }
+  43% { transform: rotate(-3deg); }
+}
+
+.library-cover img.image-unavailable {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pokeball { animation: none; }
+  .emerald-loading { transition: none; }
+}
+
+@media (max-width: 620px) {
+  .game-hud {
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 52px;
+    padding: 4px 8px 2px;
+  }
+
+  #game-menu.game-menu {
+    width: min(336px, calc(100vw - 16px));
+  }
+}

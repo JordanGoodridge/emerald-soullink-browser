@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Run tracker preview</title>
+  <link rel="stylesheet" href="/web/style.css" />
+  <link rel="stylesheet" href="/web/library.css" />
+</head>
+<body>
+  <dialog id="run-tracker-dialog" class="themed-dialog run-tracker-dialog" aria-labelledby="run-tracker-title">
+    <form class="run-tracker-form">
+      <header class="presence-head">
+        <div><h2 id="run-tracker-title">Run tracker</h2><p class="presence-status" id="run-tracker-summary">SoulLink run · 4 players</p></div>
+        <button type="button" aria-label="Close run tracker">Close</button>
+      </header>
+      <div id="run-tracker-body"></div>
+    </form>
+  </dialog>
+  <script type="module">
+    import { renderRunTrackerInto } from '../ui/run-tracker.mjs';
+    const tracker = {
+      sections: [
+        { label: 'Route 101', status: 'claimed', areas: [{ members: [{ name: 'Ash', species: 25, nickname: 'Sparky', status: 'alive' }] }] },
+        { label: 'Petalburg Woods', status: 'pending', areas: [{ members: [{ name: 'Misty', species: 120, nickname: null, status: 'pending' }] }] },
+        { label: 'Rusturf Tunnel', status: 'dead', areas: [{ members: [{ name: 'Brock', species: 74, nickname: null, status: 'dead' }] }] },
+        { label: 'Route 102 — long fixture label for wrapping', status: 'unvisited', areas: [] },
+      ],
+      gifts: [
+        { label: 'Starter Pokémon', status: 'claimed', members: [{ name: 'Ash', species: 1, nickname: 'Sprout' }] },
+        { label: 'Fossil gift', status: 'available', members: [] },
+      ],
+    };
+    renderRunTrackerInto(document.querySelector('#run-tracker-body'), tracker, document, {
+      currentArea: { label: 'Petalburg Woods', status: 'Encounter pending' },
+      speciesNameFor: (id) => ({ 25: 'PIKACHU', 120: 'STARMIE', 74: 'GEODUDE', 1: 'BULBASAUR' })[id] ?? null,
+    });
+    document.querySelector('#run-tracker-dialog').showModal();
+    document.documentElement.dataset.ready = 'true';
+  </script>
+</body>
+</html>

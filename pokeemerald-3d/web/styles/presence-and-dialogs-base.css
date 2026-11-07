@@ -1,0 +1,318 @@
+#presence-toggle {
+  color: var(--ink);
+  background: var(--mint);
+  box-shadow: 0 4px 0 var(--mint-shadow);
+}
+
+.presence-panel {
+  grid-area: presence;
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding: clamp(12px, 2.4vw, 20px);
+}
+
+.presence-panel[hidden] {
+  display: none;
+}
+
+.presence-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.presence-head h2 {
+  margin: 0;
+  color: var(--cream);
+  font-size: clamp(18px, 3.4vw, 26px);
+  line-height: 1;
+}
+
+.presence-status {
+  margin: 6px 0 0;
+  color: var(--mint);
+  font-size: clamp(12px, 2.8vw, 15px);
+  overflow-wrap: anywhere;
+}
+
+.presence-status.error {
+  color: var(--error);
+}
+
+.presence-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.presence-fields label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: clamp(12px, 2.8vw, 14px);
+}
+
+.presence-fields input {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 2px solid var(--panel-edge);
+  border-radius: 8px;
+  color: var(--text);
+  background: #07110f;
+  font: inherit;
+}
+
+.presence-fields input:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 1px;
+}
+
+.presence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.presence-actions button {
+  flex: 1 1 7rem;
+}
+
+#presence-create {
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 4px 0 var(--gold-shadow);
+}
+
+.presence-room-code {
+  margin: 0;
+  color: var(--gold);
+  font-size: clamp(14px, 3.4vw, 18px);
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.presence-roster {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.presence-roster li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #ffffff0a;
+  font-size: clamp(12px, 2.8vw, 15px);
+}
+
+.presence-roster li span {
+  color: var(--muted);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.presence-roster .presence-empty {
+  color: var(--muted);
+  justify-content: center;
+  background: transparent;
+  border: 1px dashed #ffffff22;
+}
+
+.presence-run-settings {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 10px;
+  color: var(--text);
+}
+.presence-run-settings legend { padding: 0 6px; color: var(--mint); font-weight: 700; }
+.presence-run-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; }
+.presence-run-options label { display: flex; align-items: center; gap: 8px; font-size: .88rem; }
+.presence-run-options input { accent-color: var(--mint); }
+#run-start { justify-self: end; }
+@media (max-width: 480px) { .presence-run-options { grid-template-columns: 1fr; } }
+
+.presence-lobby-save {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 10px;
+}
+.presence-lobby-save h3 { margin: 0; color: var(--mint); font-size: 1rem; }
+.lobby-slot-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; color: var(--muted); font-size: .85rem; }
+.lobby-slot-claim select { min-width: 150px; max-width: 100%; }
+
+.presence-hint {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--gold);
+  color: var(--cream);
+  background: #f1cf6214;
+  font-size: clamp(12px, 2.8vw, 14px);
+  line-height: 1.35;
+}
+
+.presence-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(11px, 2.5vw, 13px);
+  line-height: 1.35;
+  opacity: .85;
+}
+
+@media (min-width: 560px) {
+  #presence-toggle {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 900px) and (min-aspect-ratio: 6 / 5) {
+  .presence-panel {
+    max-height: 38dvh;
+    overflow: auto;
+  }
+}
+
+/* Save profile picker */
+
+#run-mode-dialog {
+  width: min(440px, calc(100vw - 24px));
+  padding: 0;
+}
+.run-mode-dialog .dialog-frame { display: grid; gap: 12px; padding: clamp(16px, 4vw, 24px); }
+.run-mode-choices { display: grid; gap: 9px; }
+.run-mode-choices button {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 9px;
+  background: #ffffff08;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.run-mode-choices button:hover, .run-mode-choices button:focus-visible {
+  border-color: var(--mint);
+  background: #18c99a18;
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+.run-mode-choices strong { color: var(--mint); }
+.run-mode-choices span { color: var(--muted); font-size: .88rem; }
+.run-mode-dialog .dialog-secondary { justify-self: end; }
+
+#starter-choice-dialog {
+  width: min(560px, calc(100vw - 24px));
+  padding: 0;
+}
+
+.starter-choice-content { display: grid; gap: 14px; padding: clamp(18px, 4vw, 28px); }
+.starter-choice-content h2 { margin: 0; text-align: center; }
+.starter-choice-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.starter-choice-list button {
+  display: grid;
+  min-height: 148px;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.starter-choice-list button:hover, .starter-choice-list button:focus-visible {
+  border-color: var(--gold);
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.starter-choice-number { color: var(--mint); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+.starter-choice-sprite {
+  width: 64px;
+  height: 64px;
+  display: block;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 rgba(21, 37, 64, 0.18));
+}
+.starter-choice-name {
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+.starter-choice-dex {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+@media (max-width: 420px) {
+  .starter-choice-list { grid-template-columns: 1fr; }
+  .starter-choice-list button { min-height: 84px; }
+}
+
+#save-profile-dialog {
+  width: min(520px, calc(100vw - 24px));
+  max-height: min(80dvh, 640px);
+  padding: 0;
+  overflow: auto;
+}
+
+.save-profile-form {
+  display: grid;
+  gap: 12px;
+  padding: clamp(12px, 2.4vw, 20px);
+}
+
+.save-profile-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.save-profile-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.save-profile-empty {
+  color: var(--muted);
+  font-size: .85em;
+  font-style: normal;
+  opacity: .8;
+}
+
+.save-profile-state {
+  color: var(--muted);
+  text-align: right;
+  font-size: .85em;
+  white-space: nowrap;
+}
+
+.save-profile-list li[data-current="true"] .save-profile-name {
+  color: var(--mint);
+  font-weight: 700;
+}
+
+.save-profile-list button {
+  min-height: 32px;
+  padding: 4px 12px;
+}
+
+#save-profile-create {
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 4px 0 var(--gold-shadow);
+}

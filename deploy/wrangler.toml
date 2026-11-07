@@ -1,0 +1,16 @@
+# Cloudflare Workers deployment for the PokeTech WASM build.
+#
+# The game is served as static assets. The Worker entry point owns the small
+# dynamic surface (/health, and later /presence) at the same origin.
+#
+#   node deploy/build-dist.mjs
+#   npx wrangler deploy --config deploy/wrangler.toml
+
+name = "poketech"
+main = "worker/index.mjs"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "../pokeemerald-3d/dist"
+binding = "ASSETS"
+not_found_handling = "none"

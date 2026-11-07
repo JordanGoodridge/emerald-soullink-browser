@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "game": {
+    "id": "toy-console",
+    "title": "Toy Console (architecture fixture)",
+    "packVersion": "0.0.0",
+    "revision": "synthetic-1"
+  },
+  "build": {
+    "source": "synthetic:toy-console",
+    "sourceRevision": "fixture-1",
+    "recipe": "embedded minimal WASM module in adapter/runtime.mjs",
+    "toolchain": "none",
+    "artifact": "adapter/runtime.mjs"
+  },
+  "runtime": {
+    "kind": "source-wasm",
+    "adapter": "adapter/runtime.mjs",
+    "abiVersion": 1,
+    "module": {
+      "id": "toy-runtime",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": true,
+      "mediaType": "application/wasm"
+    },
+    "entry": ["ToyStart", "ToyStep"],
+    "initialMemoryBytes": 65536,
+    "requiredExports": ["memory", "ToyStart", "ToyStep"],
+    "optionalExports": []
+  },
+  "rendering": {
+    "modes": ["classic"],
+    "defaultMode": "classic",
+    "sceneFormat": "gba-classic-v1",
+    "width": 240,
+    "height": 160,
+    "adapter": "adapter/scene.mjs"
+  },
+  "resources": [],
+  "saves": {
+    "formatId": "toy-console-save",
+    "formatVersion": 1,
+    "bytes": 16,
+    "codec": "adapter/saves.mjs",
+    "exportName": "toy-console.sav"
+  },
+  "nuzlocke": { "support": "none" },
+  "interiorSupport": "unsupported",
+  "capabilities": {
+    "rendering": ["classic"],
+    "presence": "none",
+    "rules": "none",
+    "link": "none",
+    "customUi": false
+  },
+  "verification": {
+    "evidence": ["game-packs/toy-console/README.md"]
+  }
+}

@@ -1,0 +1,8 @@
+# Emerald Kaizo smoke: bypass the intro, warp to Route 103, capture both modes.
+0 new-game
+120 warp 0 18 10 8
+240 screenshot kaizo-route103-hd2d
+260 view classic
+280 screenshot kaizo-route103-classic
+300 view hd2d
+320 screenshot kaizo-route103-hd2d-return

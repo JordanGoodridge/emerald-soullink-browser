@@ -1,0 +1,4 @@
+# Emerald Kaizo main-menu parity smoke.
+15000 button start on
+15004 button start off
+15400 screenshot kaizo-main-menu

@@ -1,0 +1,9 @@
+# Load a Kaizo save, let the intro finish, continue from the title, and capture.
+7000 button start on
+7004 button start off
+7400 button a on
+7404 button a off
+7800 button a on
+7804 button a off
+8200 screenshot kaizo-loaded-route-8200
+8600 screenshot kaizo-loaded-route-8600

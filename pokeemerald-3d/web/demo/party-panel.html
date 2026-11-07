@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Party panel preview</title>
+  <link rel="stylesheet" href="/web/style.css" />
+  <link rel="stylesheet" href="/web/library.css" />
+</head>
+<body>
+  <dialog id="party-panel" class="themed-dialog" aria-label="Party">
+    <form class="party-panel-form">
+      <header class="presence-head">
+        <div>
+          <h2>Party</h2>
+          <p class="presence-status" id="party-panel-summary">Not connected</p>
+        </div>
+        <button type="button">Close</button>
+      </header>
+      <div id="party-panel-body"></div>
+      <p class="presence-note">Read-only snapshots from each player. Linked pairs come from the shared run.</p>
+    </form>
+  </dialog>
+
+  <script type="module">
+    import { buildPartyPanel } from '../presence/party-panel-model.mjs';
+    import { renderPartyPanelInto } from '../ui/party-panel.mjs';
+
+    const withLinks = new URLSearchParams(location.search).get('links') === '1';
+
+    const members = [
+      { playerId: 'p1', name: 'Ash' },
+      { playerId: 'p2', name: 'Misty' },
+      { playerId: 'p3', name: 'Brock' },
+      { playerId: 'p4', name: 'Gary' },
+    ];
+
+    const self = {
+      playerId: 'p1',
+      party: {
+        availability: 'available',
+        members: [
+          { species: 25, speciesName: 'PIKACHU', nickname: 'Sparky', level: 18, hp: 42 },
+          { species: 6, speciesName: 'CHARIZARD', level: 40, hp: 120 },
+          { species: 1, speciesName: 'BULBASAUR', level: 12, hp: 30 },
+        ],
+        revision: 3,
+      },
+    };
+
+    const parties = {
+      p2: {
+        availability: 'available',
+        members: [
+          { species: 130, speciesName: 'GYARADOS', level: 22, hp: 70 },
+          { species: 120, speciesName: 'STARMIE', level: 20, hp: 55 },
+        ],
+        revision: 2,
+      },
+      p3: { availability: 'hidden', members: [], revision: 4 },
+      p4: { availability: 'unavailable', members: [], revision: 0 },
+    };
+
+    const links = withLinks ? {
+      'link:emerald:section:1': {
+        linkId: 'link:emerald:section:1',
+        areaKey: 'emerald:section:1',
+        status: 'active',
+        members: [
+          { playerId: 'p1', species: 25, nickname: 'Sparky', level: 18, status: 'alive' },
+          { playerId: 'p2', species: 120, nickname: null, level: 20, status: 'alive' },
+        ],
+      },
+      'link:emerald:section:2': {
+        linkId: 'link:emerald:section:2',
+        areaKey: 'emerald:section:2',
+        status: 'dead',
+        members: [
+          { playerId: 'p1', species: 6, level: 40, status: 'dead' },
+          { playerId: 'p2', species: 130, level: 22, status: 'dead' },
+        ],
+      },
+    } : {};
+
+    const model = buildPartyPanel({
+      self,
+      members,
+      parties,
+      links,
+      speciesNameFor: (id) => ({ 25: 'PIKACHU', 6: 'CHARIZARD', 1: 'BULBASAUR', 130: 'GYARADOS', 120: 'STARMIE' })[id] ?? null,
+    });
+
+    const players = model.players.length;
+    const linkCount = model.links.length;
+    document.querySelector('#party-panel-summary').textContent =
+      `${players} player${players === 1 ? '' : 's'} · ${linkCount} linked pair${linkCount === 1 ? '' : 's'}`;
+    renderPartyPanelInto(document.querySelector('#party-panel-body'), model);
+    document.querySelector('#party-panel').showModal();
+  </script>
+</body>
+</html>

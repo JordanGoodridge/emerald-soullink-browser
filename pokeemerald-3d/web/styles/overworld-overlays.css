@@ -1,0 +1,153 @@
+/* Battle markers */
+
+.remote-badges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.remote-badge {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(21, 37, 64, 0.94);
+  border: 1.5px solid var(--gold);
+  color: var(--gold);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: clamp(11px, 1.5vmin, 13px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: .03em;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.remote-badges.with-peer-tags .remote-badge {
+  transform: translate(-50%, calc(-100% - 26px));
+}
+
+.remote-arrow {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(21, 37, 64, 0.94);
+  border: 1.5px solid hsl(var(--hue, 160) 75% 62%);
+  color: #fffdf1;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: clamp(11px, 1.6vmin, 13px);
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* Shoulder buttons: L/R were previously keyboard-only. */
+
+.shoulders {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: clamp(6px, 1.7vw, 12px);
+}
+
+.shoulders button {
+  flex: 1 1 0;
+  max-width: 140px;
+  min-height: clamp(30px, 7vw, 40px);
+  font-size: clamp(10px, 2.6vw, 13px);
+}
+
+/* Peer chrome: name tags over on-screen players. */
+
+.peer-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.peer-overlay[hidden] {
+  display: none;
+}
+
+.peer-tag {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(21, 37, 64, 0.94);
+  border: 1.5px solid hsl(var(--hue, 160) 75% 64%);
+  color: #fffdf1;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: clamp(12px, 1.75vmin, 14px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.remote-arrow.has-icon::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 20px;
+  margin-right: 4px;
+  vertical-align: -5px;
+  background-image: var(--peer-icon);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  image-rendering: pixelated;
+}
+
+/* Battle healthbox type badges */
+
+.battle-hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.battle-hud-overlay[hidden] {
+  display: none;
+}
+
+.battle-hud-types {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transform: translate(-100%, -50%);
+  white-space: nowrap;
+}
+
+.battle-type-badge {
+  display: inline-block;
+  padding: 1px 3.5px;
+  border-radius: 3px;
+  background: var(--type-bg, #68a090);
+  border: 1px solid var(--type-border, #a6d4c7);
+  color: var(--type-text, #fffdf4);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: clamp(7px, 1.05vmin, 9.5px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.battle-type-badge[style*="--type-text"] {
+  text-shadow: none;
+}

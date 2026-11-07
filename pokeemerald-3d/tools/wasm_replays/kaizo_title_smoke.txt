@@ -1,0 +1,7 @@
+# Emerald Kaizo title/menu parity smoke: capture the boot sequence without input.
+0 screenshot kaizo-title-0
+3000 screenshot kaizo-title-3000
+6000 screenshot kaizo-title-6000
+9000 screenshot kaizo-title-9000
+12000 screenshot kaizo-title-12000
+15000 screenshot kaizo-title-15000

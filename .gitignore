@@ -1,0 +1,70 @@
+# Local toolchain (MSYS2, downloads, caches)
+.toolchain/
+
+# Preserved upstream Git history for pokeemerald-3d
+pokeemerald-3d/.git-upstream/
+.upstream/
+
+# Ignore upstream pokeemerald-wasm files inside pokeemerald-3d/ by default,
+# and explicitly track only first-party PokeTech files.
+pokeemerald-3d/*
+!pokeemerald-3d/.gitignore
+!pokeemerald-3d/AGENTS.md
+!pokeemerald-3d/docs/
+!pokeemerald-3d/docs/**
+!pokeemerald-3d/include/
+pokeemerald-3d/include/*
+!pokeemerald-3d/include/wasm/
+!pokeemerald-3d/include/wasm/**
+!pokeemerald-3d/src/
+pokeemerald-3d/src/*
+!pokeemerald-3d/src/wasm_m4a.c
+!pokeemerald-3d/src/wasm_presence.c
+!pokeemerald-3d/src/wasm_run.c
+!pokeemerald-3d/src/wasm_run_debug.c
+!pokeemerald-3d/tools/
+pokeemerald-3d/tools/*
+!pokeemerald-3d/tools/*.mjs
+!pokeemerald-3d/tools/wasm_replays/
+!pokeemerald-3d/tools/wasm_replays/**
+!pokeemerald-3d/trailer/
+pokeemerald-3d/trailer/*
+!pokeemerald-3d/trailer/README.md
+!pokeemerald-3d/trailer/scripts/
+!pokeemerald-3d/trailer/scripts/**
+!pokeemerald-3d/web/
+!pokeemerald-3d/web/**
+pokeemerald-3d/web/ui/screenshot-baselines/*.png
+
+# Build outputs
+pokeemerald-3d/build/
+pokeemerald-3d/dist/
+pokeemerald-3d/build-wasm.log
+wasm-replay-output/
+
+# Node dependencies and local test output
+node_modules/
+presence-e2e-output/
+
+# Logs and editor files
+*.log
+.wrangler/
+.vscode/
+.idea/
+.opencode/
+Thumbs.db
+desktop.ini
+deploy/*.sav
+
+# Two-pack architecture E2E output
+pokeemerald-3d/pack-e2e-output/
+pack-e2e-output/
+
+# Scratch build worktrees
+.build/
+
+# Generated game-pack artifacts, upstream-hydrated resources, and replay output
+game-packs/*/dist/
+game-packs/*/cover.png
+game-packs/emerald/resources/hoenn-region-map.png
+pokeemerald-3d/wasm-replay-*/

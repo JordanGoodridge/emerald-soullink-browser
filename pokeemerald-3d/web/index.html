@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emerald SoulLink Browser</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(location.search);
+      const mode = params.get('automate') === '1'
+        ? 'play'
+        : params.get('library') === '1'
+          ? 'library'
+          : params.get('game') ? 'play' : 'library';
+      document.documentElement.dataset.boot = mode;
+    })();
+  </script>
+  <style>
+    /* Critical pre-CSS paint: keep the selected shell background from flashing. */
+    html[data-boot="library"] { background: #f4f0d8; }
+    html[data-boot="library"] body { background: #f4f0d8; color: #173b31; }
+    html[data-boot="play"] { background: #07110f; }
+    html[data-boot="play"] body { background: #07110f; color: #f8f0d2; }
+    html[data-boot="library"] #play-shell { display: none !important; }
+    html[data-boot="play"] #library { display: none !important; }
+    html[data-boot="play"] #library-loader { display: none !important; }
+    .emerald-loading {
+      position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center;
+      background: #f8f5e8; color: #152540;
+    }
+    .emerald-loading[hidden] { display: none !important; }
+  </style>
+  <link rel="icon" href="data:," />
+  <link rel="preload" href="/web/pokeball-loader.svg" as="image" />
+  <link rel="preload" href="/web/fonts/EmeraldMenuPixel-Medium.woff" as="font" type="font/woff" crossorigin />
+  <link rel="stylesheet" href="/web/style.css" />
+  <link rel="stylesheet" href="/web/library.css" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-25RQ7HFHXS"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-25RQ7HFHXS');
+  </script>
+</head>
+<body>
+  <section id="library-loader" class="emerald-loading" role="status" aria-label="Getting your games ready">
+    <div class="loader-content">
+      <img class="pokeball" src="/web/pokeball-loader.svg" width="96" height="96" alt="" fetchpriority="high" />
+      <p class="loader-label" aria-hidden="true">Getting your games ready…</p>
+    </div>
+  </section>
+
+  <section id="library" class="library" aria-label="Your games">
+    <header class="library-head">
+      <div class="library-brand">
+        <span class="library-ball" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M3 16h8M21 16h8" stroke="currentColor" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="currentColor"/></svg>
+        </span>
+        <h1>Your games</h1>
+      </div>
+      <button id="library-settings" class="icon-button" type="button" aria-label="Open settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </header>
+
+    <p id="library-error" class="library-error" role="alert" hidden></p>
+    <article id="library-hero" class="library-hero" hidden></article>
+
+    <section class="library-grid" aria-labelledby="library-title">
+      <h2 id="library-title">Library</h2>
+      <div id="library-games" class="library-games"></div>
+      <p id="library-empty" class="library-empty" hidden>No games installed. Add a game pack to get started.</p>
+    </section>
+
+    <section class="library-saves" aria-labelledby="library-saves-title">
+      <h2 id="library-saves-title">Local game saves</h2>
+      <div id="library-saves-list" aria-live="polite"></div>
+    </section>
+
+    <p class="library-footer"><span>Select a game to start playing</span></p>
+  </section>
+
+  <dialog id="run-mode-dialog" class="themed-dialog run-mode-dialog" aria-labelledby="run-mode-title">
+    <div class="dialog-frame">
+      <header class="dialog-header">
+        <h2 id="run-mode-title">Choose how to play</h2>
+        <button id="run-mode-close" class="icon-button" type="button" aria-label="Close mode selection">×</button>
+      </header>
+      <p class="presence-note">Standard Play is ordinary Emerald. You can play solo or invite friends to explore together. Multiplayer Nuzlocke / SoulLink links encounters and shared fates.</p>
+      <div class="run-mode-choices" role="group" aria-label="Run mode">
+        <button type="button" data-run-mode="standard"><strong>Standard Play</strong><span>Ordinary Emerald, solo by default; invite friends for co-op</span></button>
+        <button type="button" data-run-mode="soullink"><strong>Multiplayer Nuzlocke / SoulLink</strong><span>Play with friends: link encounters and share fates</span></button>
+      </div>
+      <button id="run-mode-cancel" class="dialog-secondary" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <main class="shell" id="play-shell" aria-label="Emerald SoulLink Browser">
+    <canvas class="ambient" id="ambient" width="240" height="160" aria-hidden="true"></canvas>
+    <header class="masthead">
+      <h1>Emerald SoulLink Browser</h1>
+      <div class="masthead-actions">
+        <button id="game-select" type="button" aria-label="Change game">
+          Game: <span id="game-current">Emerald</span>
+        </button>
+        <a class="github-link" href="https://github.com/JordanGoodridge/emerald-soullink-browser" target="_blank" rel="noreferrer" aria-label="Open Emerald SoulLink Browser on GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.3-3.2-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.6 4.7 18.6 5 18.6 5c.6 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1.1.9 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z" />
+        </svg>
+        <span>tripplyons</span>
+        </a>
+      </div>
+    </header>
+
+    <section class="display-panel" aria-label="Game display">
+      <canvas id="screen" width="960" height="640" aria-label="Game screen"></canvas>
+      <aside id="run-notice" class="run-notice" role="status" aria-live="polite" hidden>
+        <div><strong id="run-notice-title"></strong><span id="run-notice-detail"></span></div>
+        <button id="run-notice-dismiss" type="button" aria-label="Dismiss run update">×</button>
+      </aside>
+      <div class="game-hud" aria-label="Game controls">
+        <label class="speed-hud pixel-frame" for="speed-select">
+          <span class="visually-hidden">Game speed</span>
+          <select id="speed-select" class="pixel-frame-content">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+            <option value="8">8x</option>
+            <option value="unlimited">Unlimited</option>
+          </select>
+        </label>
+        <button id="menu-toggle" class="icon-button hud-menu-button pixel-frame" type="button" aria-haspopup="dialog" aria-controls="game-menu" aria-expanded="false" aria-label="Open game menu">
+          <span class="pixel-frame-content"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span>
+        </button>
+      </div>
+    </section>
+
+    <div class="status" id="status" role="status" aria-live="polite">loading wasm…</div>
+
+    <section class="controls" aria-label="Controls">
+      <div class="dpad" aria-label="Directional pad">
+        <button data-key="up" aria-label="Up">↑</button>
+        <button data-key="left" aria-label="Left">←</button>
+        <button data-key="right" aria-label="Right">→</button>
+        <button data-key="down" aria-label="Down">↓</button>
+      </div>
+
+      <div class="face" aria-label="Action buttons">
+        <button data-key="b">B</button>
+        <button data-key="a">A</button>
+        <button data-key="select">SELECT</button>
+        <button data-key="start">START</button>
+      </div>
+
+      <div class="shoulders" aria-label="Shoulder buttons">
+        <button data-key="l" aria-label="L button">L</button>
+        <button data-key="r" aria-label="R button">R</button>
+      </div>
+
+      <div class="speed-control" aria-label="Speed controls">
+        <div class="speed-heading">Speed <output id="speed-value">1x</output></div>
+        <div class="speed-buttons">
+          <button type="button" data-speed="0.5">0.5x</button>
+          <button type="button" data-speed="1">1x</button>
+          <button type="button" data-speed="2">2x</button>
+          <button type="button" data-speed="4">4x</button>
+          <button type="button" data-speed="8">8x</button>
+          <button type="button" data-speed="unlimited">Unlimited</button>
+        </div>
+      </div>
+
+      <div class="utility-controls" aria-label="Save and display controls">
+        <button id="presence-toggle" type="button" aria-expanded="false" aria-controls="presence-panel">Play with friends</button>
+        <button id="save-profile" type="button" aria-haspopup="dialog" aria-controls="save-profile-dialog">Save game</button>
+        <button id="audio-mute-toggle" type="button" aria-pressed="false">Sound: On</button>
+        <button id="settings" type="button" aria-haspopup="dialog" aria-controls="settings-dialog">Customise</button>
+      </div>
+    </section>
+
+    <section class="presence-panel themed-panel" id="presence-panel" hidden aria-label="Play with friends">
+      <div class="presence-panel-content">
+        <header class="presence-head" id="presence-default-head">
+          <div>
+            <h2>Play with friends</h2>
+            <p class="presence-status" id="presence-status" role="status" aria-live="polite">Not connected</p>
+          </div>
+          <button id="presence-close" type="button" aria-label="Close friends panel">Close</button>
+        </header>
+
+        <header class="presence-head soul-link-pregame-header" id="soul-link-pregame-header" hidden>
+          <div>
+            <h2>Nuzlocke with friends</h2>
+            <p class="presence-note">Create a room or join the host. The host starts the run when everyone is ready.</p>
+          <p class="presence-status" id="soul-link-pregame-status" role="status" aria-live="polite">Create a room for a new run, or join a friend. Select a saved run below to resume.</p>
+          </div>
+          <button id="soul-link-pregame-back" type="button">Back to games</button>
+        </header>
+
+        <header class="presence-head standard-lobby-header" id="standard-lobby-header" hidden>
+          <div>
+            <h2>Standard Play</h2>
+            <p class="presence-note">Start solo or invite friends. Each player keeps an independent Emerald game and save.</p>
+            <p class="presence-status" id="standard-lobby-status" role="status" aria-live="polite">Your offline lobby is ready.</p>
+            <button id="standard-lobby-cancel-resume" type="button" hidden>Start fresh instead</button>
+          </div>
+          <button id="standard-lobby-back" type="button">Back to games</button>
+        </header>
+
+        <fieldset class="presence-run-settings standard-lobby-settings" id="standard-lobby-settings" hidden>
+          <legend>Standard settings</legend>
+          <dl>
+            <div><dt>Rules</dt><dd>Ordinary Emerald play; no Nuzlocke or SoulLink rules.</dd></div>
+            <div><dt>Saves</dt><dd>Main save for solo play; individual Emerald saves in co-op.</dd></div>
+            <div><dt>Players</dt><dd>One or more. You can start solo or invite friends first.</dd></div>
+          </dl>
+          <button id="standard-lobby-start" type="button">Start Standard Play</button>
+        </fieldset>
+
+        <section class="soullink-saved-lobbies" id="soullink-saved-lobbies" hidden aria-label="Saved Nuzlocke runs">
+          <h3>Resume a run</h3>
+          <p class="presence-note">Runs are saved in this browser. To resume together, each player selects their saved run, then joins the same room.</p>
+          <ul id="soullink-saved-lobby-list" class="presence-roster"></ul>
+        </section>
+
+        <section class="soullink-saved-lobbies" id="standard-saved-lobbies" hidden aria-label="Saved Standard co-op lobbies">
+          <h3>Resume a co-op lobby</h3>
+          <p class="presence-note">Choose a saved lobby, then create a room or join the host. Each player restores their own Emerald save.</p>
+          <ul id="standard-saved-lobby-list" class="presence-roster"></ul>
+        </section>
+
+        <div class="presence-fields" id="presence-fields">
+          <label for="presence-name">
+            <span>Your name</span>
+            <input id="presence-name" type="text" maxlength="24" autocomplete="nickname" />
+          </label>
+          <label for="presence-room">
+            <span>Room code</span>
+            <input id="presence-room" type="text" maxlength="8" inputmode="text" autocomplete="off"
+                   spellcheck="false" placeholder="ABCDEFGH" />
+          </label>
+        </div>
+
+        <div class="presence-actions" id="presence-actions">
+          <button id="presence-create" type="button">Create room</button>
+          <button id="presence-join" type="button">Join room</button>
+          <button id="presence-leave" type="button" disabled>Leave</button>
+        </div>
+
+        <p class="presence-room-code" id="presence-room-code" hidden></p>
+        <ul class="presence-roster" id="presence-roster" aria-label="Players in this room"></ul>
+        <p class="presence-hint" id="presence-hint" hidden></p>
+        <p class="presence-run-mode-note" id="presence-run-mode-note" hidden></p>
+        <fieldset class="presence-run-settings" id="presence-run-settings" hidden>
+          <legend>Nuzlocke run settings</legend>
+          <div class="presence-run-options">
+            <label><input id="run-randomize-wild" type="checkbox" /> Randomize wild encounters</label>
+            <label><input id="run-power-balance-wild" type="checkbox" /> Power-balance wild encounters</label>
+            <label><input id="run-randomize-trainers" type="checkbox" /> Randomize trainers</label>
+            <label><input id="run-power-balance-trainers" type="checkbox" /> Power-balance trainers</label>
+            <label><input id="run-randomize-gyms" type="checkbox" /> Randomize Gyms and bosses</label>
+            <label><input id="run-power-balance-gyms" type="checkbox" /> Power-balance Gyms and bosses</label>
+            <label><input id="run-randomize-starters" type="checkbox" /> Randomize starter choices</label>
+            <label><input id="run-allow-linked-pc" type="checkbox" /> Allow boxing linked Pokémon independently</label>
+            <label><input id="run-move-relearner" type="checkbox" checked /> Enable move relearner</label>
+            <label><input id="run-party-level-sync" type="checkbox" checked /> Sync Pokémon levels to party max (Gym-capped)</label>
+            <label><input id="run-infinite-money" type="checkbox" checked /> Start with max money (¥999,999)</label>
+          </div>
+          <p class="presence-note" id="presence-run-settings-note">Host settings are shared; enabled randomization is personalized per player.</p>
+          <button id="run-start" type="button" hidden>Start run</button>
+        </fieldset>
+        <section class="presence-lobby-save" id="lobby-save-controls" hidden aria-label="Lobby saves">
+          <h3>Lobby saves</h3>
+          <p class="presence-note" id="lobby-save-status">Preparing autosave in this browser…</p>
+          <p class="presence-note">Each player keeps an individual Emerald save in this lobby. Back up the lobby to move its player saves to another browser or device.</p>
+          <div class="presence-actions">
+            <button id="member-save-slot" type="button">Save my game now</button>
+            <button id="lobby-download" type="button" hidden>Back up lobby</button>
+            <details class="lobby-more-options">
+              <summary>More options</summary>
+              <label class="lobby-slot-claim" id="lobby-slot-claim-label" hidden>
+                <span>Change player slot</span>
+                <select id="lobby-slot-claim" aria-label="Player slot to change"></select>
+                <button id="lobby-slot-claim-button" type="button">Change slot</button>
+              </label>
+              <label id="lobby-import-label" class="upload-save" for="lobby-import" hidden>Restore lobby backup</label>
+              <input id="lobby-import" type="file" accept=".ptlobby,application/json" hidden />
+            </details>
+          </div>
+        </section>
+        <p class="presence-note">Up to four players. You share the world, not the story: NPCs, quests, items and saves stay yours.</p>
+      </div>
+    </section>
+
+    <dialog id="group-wipe-dialog" class="group-wipe-dialog" aria-labelledby="group-wipe-title">
+      <section class="group-wipe-screen" id="group-wipe-screen">
+        <header class="group-wipe-heading">
+          <p class="group-wipe-kicker" id="group-wipe-kicker">NUZLOCKE RUN PAUSED</p>
+          <h2 id="group-wipe-title">Group wipe</h2>
+        </header>
+        <p id="group-wipe-reason" class="group-wipe-reason">
+          No living Pokémon remain in the active party. Pokémon in the PC do not prevent a wipe.
+        </p>
+        <div id="post-run-summary-body" class="post-run-summary-body" aria-live="polite"></div>
+        <ul class="group-wipe-members" id="group-wipe-members" aria-label="Player readiness"></ul>
+        <p class="group-wipe-next-step">Everyone readies, then the host starts a new run.</p>
+        <div class="group-wipe-actions">
+          <button id="run-download-poster" type="button">Save Run Poster (.png)</button>
+          <button id="run-ready" type="button">I’m ready</button>
+          <button id="run-restart" type="button" hidden disabled>Start new run</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="save-profile-dialog" class="themed-dialog" aria-labelledby="save-profile-title">
+      <form method="dialog" class="save-profile-form">
+        <header class="presence-head">
+          <div>
+            <h2 id="save-profile-title">Save game</h2>
+            <p class="presence-status" id="save-profile-current"></p>
+          </div>
+          <button value="cancel" aria-label="Close Save game">Close</button>
+        </header>
+
+        <p class="presence-note">Save your current game to this browser.</p>
+        <div class="save-time-status" aria-label="Save times">
+          <p><span>Last save</span><time id="save-last-game">Not recorded</time></p>
+          <p><span>Last auto save</span><time id="save-last-auto">Not recorded</time></p>
+        </div>
+        <p class="presence-hint" id="save-profile-hint" role="status" aria-live="polite" hidden></p>
+        <div class="presence-actions">
+          <button type="button" id="save-game-now">Save now</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="game-menu" class="game-menu" aria-labelledby="game-menu-title">
+      <div class="game-menu-body">
+        <header class="game-menu-head">
+          <h2 id="game-menu-title">Game menu</h2>
+          <button id="game-menu-close" class="icon-button" type="button" aria-label="Close game menu">×</button>
+        </header>
+        <div class="game-menu-actions">
+          <button id="game-menu-party" type="button"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7-1a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3.5 19c.3-3 2.2-4.5 5.5-4.5s5.2 1.5 5.5 4.5h-11Zm11.5 0c-.1-1.7-.7-3-1.8-3.9.6-.4 1.5-.6 2.8-.6 2.7 0 4.2 1.5 4.5 4.5H15Z"/></svg></span><span class="menu-label">Party</span><b class="menu-arrow">›</b></button>
+          <button id="game-menu-run-tracker" type="button"><span class="menu-icon" aria-hidden="true">✦</span><span class="menu-label">Run tracker</span><b class="menu-arrow">›</b></button>
+          <button id="game-menu-resume" type="button"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.8v14.4L19 12 7 4.8Z"/></svg></span><span class="menu-label">Resume</span><kbd>Esc</kbd></button>
+          <button id="game-menu-save" type="button"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3h13l4 4v14H3V3h1Zm3 0v6h10V3M7 21v-8h10v8"/><path d="M9 3h5v4H9z"/></svg></span><span class="menu-label">Save game</span><b class="menu-arrow">›</b></button>
+          <button id="game-menu-friends" type="button"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7-1.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM2.5 19c.2-3.1 2.2-4.7 6-4.7s5.8 1.6 6 4.7h-12Zm11.7-4.2c.5-.3 1.2-.5 2.3-.5 3.2 0 4.8 1.6 5 4.7h-5.3c-.1-1.8-.8-3.2-2-4.2Z"/></svg></span><span class="menu-label">Play with friends</span></button>
+          <button id="game-menu-settings" type="button"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8.1a3.9 3.9 0 1 0 0 7.8 3.9 3.9 0 0 0 0-7.8Zm0-5.1 1.1 2.1 2.3.5 2-1.2 2.2 2.2-1.2 2 .5 2.3 2.1 1.1v3.1l-2.1 1.1-.5 2.3 1.2 2-2.2 2.2-2-1.2-2.3.5L12 22h-3l-1.1-2.1-2.3-.5-2 1.2-2.2-2.2 1.2-2-.5-2.3L0 13v-3.1L2.1 8.8l.5-2.3-1.2-2L3.6 2.3l2 1.2 2.3-.5L9 1h3Z" transform="translate(2 0) scale(.83)"/></svg></span><span class="menu-label">Settings</span><b class="menu-arrow">›</b></button>
+          <button id="game-menu-change" type="button"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4zM7 9h10v6H7zM9 18v2m6-2v2"/></svg></span><span class="menu-label">Change game</span></button>
+        </div>
+        <footer class="game-menu-footer" id="game-menu-game">Emerald</footer>
+      </div>
+    </dialog>
+
+    <dialog id="starter-choice-dialog" class="themed-dialog starter-choice-dialog" aria-labelledby="starter-choice-title">
+      <section class="starter-choice-content">
+        <h2 id="starter-choice-title">Choose your starter</h2>
+        <p id="starter-choice-seed" class="presence-hint"></p>
+        <div id="starter-choice-list" class="starter-choice-list"></div>
+      </section>
+    </dialog>
+
+    
+
+    <dialog id="people-map" class="people-map" aria-labelledby="people-map-title">
+      <form method="dialog" class="people-map-form">
+        <header class="presence-head">
+          <div>
+            <h2 id="people-map-title">Hoenn map</h2>
+            <p class="presence-status" id="people-map-summary">Not connected</p>
+          </div>
+          <button value="cancel" aria-label="Close Hoenn map">Close</button>
+        </header>
+
+        <div id="people-map-body"></div>
+
+        <p class="presence-note">M opens and closes the map. Each marker shows which route or town a friend is visiting.</p>
+      </form>
+    </dialog>
+
+    <dialog id="party-panel" class="party-panel themed-dialog" aria-labelledby="party-panel-title">
+      <form method="dialog" class="party-panel-form">
+        <header class="presence-head">
+          <div>
+            <h2 id="party-panel-title">Party</h2>
+            <p class="presence-status" id="party-panel-summary">Not connected</p>
+          </div>
+          <button value="cancel" aria-label="Close party">Close</button>
+        </header>
+        <div id="party-panel-body"></div>
+        <p class="presence-note">Other players’ parties are read-only. Enable the move relearner in the game lobby settings to edit your own Pokémon.</p>
+      </form>
+    </dialog>
+
+    <dialog id="run-tracker-dialog" class="themed-dialog run-tracker-dialog" aria-labelledby="run-tracker-title">
+      <form method="dialog" class="run-tracker-form">
+        <header class="presence-head">
+          <div><h2 id="run-tracker-title">Run tracker</h2><p class="presence-status" id="run-tracker-summary"></p></div>
+          <button value="cancel" aria-label="Close run tracker">Close</button>
+        </header>
+        <div id="run-tracker-body" aria-live="polite"></div>
+      </form>
+    </dialog>
+
+    <dialog id="move-relearner-dialog" class="themed-dialog move-relearner-dialog" aria-labelledby="move-relearner-title">
+      <form method="dialog" class="move-relearner-form">
+        <header class="presence-head">
+          <div>
+            <h2 id="move-relearner-title">Move relearner</h2>
+            <p class="presence-status" id="move-relearner-pokemon"></p>
+          </div>
+          <button value="cancel" aria-label="Close move relearner">Close</button>
+        </header>
+        <p class="presence-note">Choose a move this Pokémon learned before, then add it to an empty slot or replace one of its current moves.</p>
+        <label class="settings-row" for="move-relearner-choice">
+          <span>Move to learn</span>
+          <select id="move-relearner-choice"></select>
+        </label>
+        <label class="settings-row" for="move-relearner-slot">
+          <span>Move slot to replace</span>
+          <select id="move-relearner-slot"></select>
+        </label>
+        <p class="presence-status" id="move-relearner-status" role="status" aria-live="polite"></p>
+        <div class="presence-actions">
+          <button id="move-relearner-teach" type="button" disabled>Teach move</button>
+        </div>
+      </form>
+    </dialog>
+
+    <p class="keys" id="keys-help">Keyboard: arrows, Z=A, X=B, Q/E=L/R, Enter=Start, Shift=Select, M=find people.</p>
+  </main>
+
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <form method="dialog" class="settings-form">
+        <header class="presence-head">
+          <div>
+            <h2 id="settings-title">Settings</h2>
+            <p class="presence-status">Display, controls and peers</p>
+          </div>
+          <button value="cancel" aria-label="Close customisation">Close</button>
+        </header>
+
+        <section class="settings-group" aria-labelledby="settings-controls-title">
+          <h3 id="settings-controls-title">Controls</h3>
+          <label class="settings-row" for="settings-scheme">
+            <span>Movement</span>
+            <select id="settings-scheme">
+              <option value="arrows">Arrow keys</option>
+              <option value="wasd">WASD</option>
+            </select>
+          </label>
+
+          <table class="settings-bindings">
+            <caption>Bindings for the selected movement scheme</caption>
+            <thead>
+              <tr><th scope="col">Action</th><th scope="col">Keys</th></tr>
+            </thead>
+            <tbody id="settings-bindings"></tbody>
+          </table>
+
+          <p class="presence-note">L and R sit on Q and E so WASD can use A and S. Bindings are fixed for now.</p>
+        </section>
+
+        <section class="settings-group" aria-labelledby="settings-display-title">
+          <h3 id="settings-display-title">Display</h3>
+      <label class="resolution-control" for="render-scale">
+        <span>Render resolution</span>
+        <select id="render-scale">
+          <option value="1">240 × 160 (1×)</option>
+          <option value="2">480 × 320 (2×)</option>
+          <option value="3">720 × 480 (3×)</option>
+          <option value="4" selected>960 × 640 (4×)</option>
+          <option value="6">1440 × 960 (6×)</option>
+          <option value="8">1920 × 1280 (8×)</option>
+        </select>
+      </label>
+
+      <label class="render-control" for="visual-mode">
+        <span>World view</span>
+        <select id="visual-mode">
+          <option value="classic">Classic</option>
+          <option value="hd2d" selected>3D diorama</option>
+        </select>
+      </label>
+
+      <label class="render-control" for="shading-strength">
+        <span>Lighting <output id="shading-value">50%</output></span>
+        <input id="shading-strength" type="range" min="0" max="100" value="50" />
+      </label>
+
+      <label class="render-control" for="depth-strength">
+        <span>Camera tilt <output id="depth-value">50%</output></span>
+        <input id="depth-strength" type="range" min="0" max="100" value="50" />
+      </label>
+
+
+      <label class="render-control" for="zoom-out">
+        <span>World zoom <output id="zoom-value">100%</output></span>
+        <input id="zoom-out" type="range" min="0" max="100" value="100" />
+      </label>
+
+      <label class="render-control" for="optics-strength">
+        <span>Diorama focus <output id="optics-value">50%</output></span>
+        <input id="optics-strength" type="range" min="0" max="100" value="50" />
+      </label>
+
+        </section>
+
+        <section class="settings-group" aria-labelledby="settings-peer-title">
+          <h3 id="settings-peer-title">Peer display</h3>
+          <label class="settings-check">
+            <input id="settings-name-tags" type="checkbox" />
+            <span>Name tags over players</span>
+          </label>
+          <label class="settings-check">
+            <input id="settings-indicators" type="checkbox" />
+            <span>Edge indicators for off-screen players</span>
+          </label>
+          <label class="settings-check">
+            <input id="settings-icons" type="checkbox" />
+            <span>Avatar icons on edge indicators</span>
+          </label>
+          <label class="settings-check">
+            <input id="settings-people-map" type="checkbox" />
+            <span>Friends world map (M)</span>
+          </label>
+          <label class="settings-check">
+            <input id="settings-party-shared" type="checkbox" />
+            <span>Share my party with the room</span>
+          </label>
+        </section>
+
+        <section class="settings-group" aria-labelledby="settings-audio-title">
+          <h3 id="settings-audio-title">Audio</h3>
+          <label class="settings-check">
+            <input id="settings-sound-muted" type="checkbox" />
+            <span>Mute game audio</span>
+          </label>
+          <label class="render-control" for="settings-sound-volume">
+            <span>Master volume <output id="settings-sound-volume-value">80%</output></span>
+            <input id="settings-sound-volume" type="range" min="0" max="100" value="80" />
+          </label>
+        </section>
+      </form>
+    </dialog>
+
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>

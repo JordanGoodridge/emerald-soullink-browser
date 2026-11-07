@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "game": {
+    "id": "test-classic",
+    "title": "Test Classic",
+    "packVersion": "0.0.0",
+    "revision": "architecture capability fixture"
+  },
+  "build": {
+    "source": "synthetic:emerald-reference",
+    "sourceRevision": "synthetic-classic-1",
+    "recipe": "reuse build/wasm/pokeemerald.wasm",
+    "toolchain": "same as emerald",
+    "artifact": "build/wasm/pokeemerald.wasm"
+  },
+  "runtime": {
+    "kind": "source-wasm",
+    "adapter": "adapter/runtime.mjs",
+    "abiVersion": 1,
+    "module": {
+      "id": "wasm",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": false,
+      "url": "/build/wasm/pokeemerald.wasm",
+      "sha256": "pending",
+      "mediaType": "application/wasm",
+      "bytes": 268435456
+    },
+    "entry": ["AgbMain", "WasmRunFrame"],
+    "initialMemoryBytes": 268435456,
+    "requiredExports": ["memory", "AgbMain", "WasmRunFrame", "WasmDisplayBuffer", "WasmDisplayBufferSize", "WasmRenderFrame"],
+    "optionalExports": ["WasmRenderHd2dFrame", "WasmDisplaySceneKind"]
+  },
+  "rendering": {
+    "modes": ["classic"],
+    "defaultMode": "classic",
+    "sceneFormat": "gba-classic-v1",
+    "width": 240,
+    "height": 160,
+    "adapter": "adapter/scene.mjs"
+  },
+  "resources": [
+    {
+      "id": "wasm",
+      "kind": "runtime",
+      "group": "boot",
+      "embedded": false,
+      "url": "/build/wasm/pokeemerald.wasm",
+      "sha256": "pending",
+      "mediaType": "application/wasm",
+      "bytes": 268435456
+    }
+  ],
+  "saves": {
+    "formatId": "test-classic-flash-128k",
+    "formatVersion": 1,
+    "bytes": 131072,
+    "codec": "adapter/saves.mjs",
+    "exportName": "test-classic.sav"
+  },
+  "nuzlocke": {
+    "support": "none"
+  },
+  "interiorSupport": "unsupported",
+  "capabilities": {
+    "rendering": ["classic"],
+    "presence": "none",
+    "rules": "none",
+    "link": "none",
+    "customUi": false
+  },
+  "verification": {
+    "evidence": ["README.md"]
+  }
+}

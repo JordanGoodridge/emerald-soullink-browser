@@ -1,0 +1,2 @@
+# Capture the Kaizo main menu with the user-supplied save loaded.
+15000 screenshot kaizo-user-main-menu

@@ -1,0 +1,2187 @@
+diff --git a/Makefile b/Makefile
+index 04e2380..7b7873f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -19,6 +19,12 @@ MID_SUBDIR := sound/songs/midi
+ 
+ SHELL := bash -o pipefail
+ 
++ifeq ($(OS),Windows_NT)
++  # Windows Python defaults to cp1252, but the game's data files are UTF-8.
++  export PYTHONUTF8 := 1
++  export PYTHONIOENCODING := utf-8
++endif
++
+ EXE :=
+ ifeq ($(OS),Windows_NT)
+   EXE := .exe
+@@ -35,6 +41,7 @@ MAPJSON  := $(TOOLS_DIR)/mapjson/mapjson$(EXE)
+ JSONPROC := $(TOOLS_DIR)/jsonproc/jsonproc$(EXE)
+ 
+ MAKEFLAGS += --no-print-directory
++Q := $(if $(V),,@)
+ 
+ .SUFFIXES:
+ .SECONDARY:
+@@ -73,25 +80,31 @@ WASM_DATA_ASM_SRCS := \
+ 	$(DATA_ASM_SUBDIR)/battle_scripts_1.s \
+ 	$(DATA_ASM_SUBDIR)/battle_scripts_2.s \
+ 	$(DATA_ASM_SUBDIR)/battle_ai_scripts.s \
+-	$(DATA_ASM_SUBDIR)/battle_anim_scripts.s
++	$(DATA_ASM_SUBDIR)/battle_anim_scripts.s \
++	$(DATA_ASM_SUBDIR)/sound_data.s
+ WASM_DATA_OBJS := $(patsubst $(DATA_ASM_SUBDIR)/%.s,$(WASM_OBJ_DIR)/%.o,$(WASM_DATA_ASM_SRCS))
+ MID_SRCS := $(wildcard $(MID_SUBDIR)/*.mid)
++MID_ASM_SRCS := $(patsubst $(MID_SUBDIR)/%.mid,$(MID_SUBDIR)/%.s,$(MID_SRCS))
++DIRECT_SOUND_WAVS := $(wildcard sound/direct_sound_samples/*.wav sound/direct_sound_samples/phonemes/*.wav)
++DIRECT_SOUND_BINS := $(patsubst %.wav,%.bin,$(DIRECT_SOUND_WAVS))
++CRY_WAVS := $(wildcard sound/direct_sound_samples/cries/*.wav)
++CRY_BINS := $(patsubst %.wav,%.bin,$(CRY_WAVS))
+ 
+ wasm: generated wasm-assets $(WASM)
+ 
+ wasm-assets: $(GFX)
+-	uv run python tools/generate_wasm_assets.py
++	$(Q)uv run python tools/generate_wasm_assets.py
+ 
+ $(WASM_SOUND_HEADER): tools/generate_wasm_sound.py sound/song_table.inc sound/songs/midi/midi.cfg $(MID_SRCS)
+ 	@mkdir -p $(dir $@)
+ 	uv run python tools/generate_wasm_sound.py $@
+ 
+ $(WASM_C_OBJS): | generated wasm-assets
+-$(WASM_OBJ_DIR)/m4a.o: $(WASM_SOUND_HEADER)
+ 
+ $(WASM): Makefile $(WASM_C_OBJS) $(WASM_DATA_OBJS)
+ 	@test -n "$(WASM_LD)" || { echo "wasm-ld not found; set WASM_LD=/path/to/wasm-ld"; exit 1; }
+-	$(WASM_LD) $(WASM_LDFLAGS) --no-entry --allow-undefined --initial-memory=268435456 --max-memory=268435456 --export=AgbMain --export=WasmRunFrame --export-all -o $@ $(filter %.o,$^)
++	@echo "  LD      $@"
++	$(Q)$(WASM_LD) $(WASM_LDFLAGS) --no-entry --allow-undefined --initial-memory=268435456 --max-memory=268435456 --export=AgbMain --export=WasmRunFrame --export-all -o $@ $(filter %.o,$^)
+ 
+ $(WASM_OBJ_DIR)/sprite.o: Makefile
+ $(WASM_OBJ_DIR)/sprite.o: WASM_OPT_FLAGS := -O3
+@@ -105,12 +118,14 @@ $(WASM_OBJ_DIR)/wasm_display.o: WASM_OPT_FLAGS := -O3
+ 
+ $(WASM_OBJ_DIR)/%.o: $(C_SUBDIR)/%.c
+ 	@mkdir -p $(dir $@)
+-	$(WASM_CC) --target=wasm32-unknown-unknown -DMODERN=1 -DWASM=1 -I $(WASM_BUILD_DIR) -I include/wasm -I include -iquote include -E $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(WASM_CC) --target=wasm32-unknown-unknown -x c $(WASM_OPT_FLAGS) -Wno-incompatible-library-redeclaration -Wno-unknown-attributes -Wno-ignored-attributes -Wno-parentheses -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-builtin-requires-header -Wno-gnu-alignof-expression -Wno-unknown-escape-sequence -Wno-excess-initializers -c - -o $@
++	@echo "  CC      $<"
++	$(Q)$(WASM_CC) --target=wasm32-unknown-unknown -DMODERN=1 -DWASM=1 -I $(WASM_BUILD_DIR) -I include/wasm -I include -iquote include -E $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(WASM_CC) --target=wasm32-unknown-unknown -x c $(WASM_OPT_FLAGS) -Wno-incompatible-library-redeclaration -Wno-unknown-attributes -Wno-ignored-attributes -Wno-parentheses -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-builtin-requires-header -Wno-gnu-alignof-expression -Wno-unknown-escape-sequence -Wno-excess-initializers -c - -o $@
+ 
+ $(WASM_OBJ_DIR)/%.o: $(DATA_ASM_SUBDIR)/%.s tools/wasm_asm_data.py | generated
+ 	@mkdir -p $(dir $@) $(WASM_BUILD_DIR)
+-	uv run python tools/wasm_asm_data.py $< $(WASM_BUILD_DIR)/$*.wasm.s
+-	$(WASM_CC) --target=wasm32-unknown-unknown -c $(WASM_BUILD_DIR)/$*.wasm.s -o $@
++	@echo "  AS      $<"
++	$(Q)uv run python tools/wasm_asm_data.py $< $(WASM_BUILD_DIR)/$*.wasm.s
++	$(Q)$(WASM_CC) --target=wasm32-unknown-unknown -c $(WASM_BUILD_DIR)/$*.wasm.s -o $@
+ 
+ serve-wasm: wasm
+ 	node web/server.mjs
+@@ -125,6 +140,7 @@ include audio_rules.mk
+ 
+ $(WASM_OBJ_DIR)/maps.o: $(DATA_ASM_SUBDIR)/maps.s $(LAYOUTS_DIR)/layouts.inc $(LAYOUTS_DIR)/layouts_table.inc $(MAPS_DIR)/headers.inc $(MAPS_DIR)/groups.inc $(MAPS_DIR)/connections.inc $(MAP_CONNECTIONS) $(MAP_HEADERS)
+ $(WASM_OBJ_DIR)/map_events.o: $(DATA_ASM_SUBDIR)/map_events.s $(MAPS_DIR)/events.inc $(MAP_EVENTS)
++$(WASM_OBJ_DIR)/sound_data.o: $(DATA_ASM_SUBDIR)/sound_data.s $(DIRECT_SOUND_BINS) $(CRY_BINS) $(MID_ASM_SRCS)
+ 
+ generated: $(AUTO_GEN_TARGETS)
+ 	@: # Silence the "Nothing to be done" message.
+diff --git a/data/battle_scripts_2.s b/data/battle_scripts_2.s
+index 954509c..927e9fd 100644
+--- a/data/battle_scripts_2.s
++++ b/data/battle_scripts_2.s
+@@ -110,6 +110,12 @@ BattleScript_TrainerBallBlock::
+ 	waitmessage B_WAIT_TIME_LONG
+ 	finishaction
+ 
++BattleScript_RunCaptureBlocked::
++	waitmessage B_WAIT_TIME_LONG
++	printstring STRINGID_RUNCAPTUREBLOCKED
++	waitmessage B_WAIT_TIME_LONG
++	finishaction
++
+ BattleScript_PlayerUsesItem::
+ 	moveendcase MOVEEND_MIRROR_MOVE
+ 	end
+diff --git a/include/battle_scripts.h b/include/battle_scripts.h
+index cf39de3..7c9b4b9 100644
+--- a/include/battle_scripts.h
++++ b/include/battle_scripts.h
+@@ -218,6 +218,7 @@ extern const u8 BattleScript_SuccessBallThrow[];
+ extern const u8 BattleScript_WallyBallThrow[];
+ extern const u8 BattleScript_ShakeBallThrow[];
+ extern const u8 BattleScript_TrainerBallBlock[];
++extern const u8 BattleScript_RunCaptureBlocked[];
+ extern const u8 BattleScript_RunByUsingItem[];
+ extern const u8 BattleScript_ActionWatchesCarefully[];
+ extern const u8 BattleScript_ActionGetNear[];
+diff --git a/include/constants/battle_string_ids.h b/include/constants/battle_string_ids.h
+index b34cf6c..29e53d4 100644
+--- a/include/constants/battle_string_ids.h
++++ b/include/constants/battle_string_ids.h
+@@ -258,6 +258,7 @@
+ #define STRINGID_WALLYUSEDITEM              258
+ #define STRINGID_TRAINERBLOCKEDBALL         259
+ #define STRINGID_DONTBEATHIEF               260
++#define STRINGID_RUNCAPTUREBLOCKED          381
+ #define STRINGID_ITDODGEDBALL               261
+ #define STRINGID_YOUMISSEDPKMN              262
+ #define STRINGID_PKMNBROKEFREE              263
+@@ -379,7 +380,7 @@
+ #define STRINGID_TRAINER1WINTEXT            379
+ #define STRINGID_TRAINER2WINTEXT            380
+ 
+-#define BATTLESTRINGS_COUNT                 381
++#define BATTLESTRINGS_COUNT                 382
+ 
+ // This is the string id that gBattleStringsTable starts with.
+ // String ids before this (e.g. STRINGID_INTROMSG) are not in the table,
+diff --git a/include/load_save.h b/include/load_save.h
+index 389bd5a..1e1cee8 100644
+--- a/include/load_save.h
++++ b/include/load_save.h
+@@ -46,6 +46,11 @@ void SetContinueGameWarpStatusToDynamicWarp(void);
+ void ClearContinueGameWarpStatus2(void);
+ void SavePlayerParty(void);
+ void LoadPlayerParty(void);
++void ClearWallyTutorialPartyBackup(void);
++void BackupPlayerPartyForWallyTutorial(void);
++bool8 IsWallyTutorialPartyActive(void);
++struct Pokemon *GetWallyTutorialSavedSlot0(void);
++u8 GetWallyTutorialSavedPartyCount(void);
+ void SaveObjectEvents(void);
+ void LoadObjectEvents(void);
+ void CopyPartyAndObjectsToSave(void);
+diff --git a/src/battle_main.c b/src/battle_main.c
+index 27314c2..1eebdae 100644
+--- a/src/battle_main.c
++++ b/src/battle_main.c
+@@ -47,6 +47,9 @@
+ #include "text.h"
+ #include "trig.h"
+ #include "tv.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "util.h"
+ #include "window.h"
+ #include "constants/abilities.h"
+@@ -1957,6 +1960,22 @@ static void SpriteCB_UnusedBattleInit_Main(struct Sprite *sprite)
+     }
+ }
+ 
++static u16 GetTrainerPokemonSpecies(u16 trainerNum, u8 partyIndex, u16 originalSpecies)
++{
++#if WASM
++    u16 species = WasmRunRandomSpecies(WasmRunTrainerKind(trainerNum), originalSpecies, trainerNum, partyIndex);
++    // A bad/stale run hook must not feed SPECIES_NONE, Egg, or an out-of-range
++    // ID to CreateMon and the species sprite/name tables.
++    if (species == SPECIES_NONE || species >= NUM_SPECIES)
++        return originalSpecies;
++    return species;
++#else
++    (void)trainerNum;
++    (void)partyIndex;
++    return originalSpecies;
++#endif
++}
++
+ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 firstTrainer)
+ {
+     u32 nameHash = 0;
+@@ -2006,29 +2025,36 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+             {
+                 const struct TrainerMonNoItemDefaultMoves *partyData = gTrainers[trainerNum].party.NoItemDefaultMoves;
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                {
++                    u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
++                    for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                        nameHash += gSpeciesNames[species][j];
+ 
+-                personalityValue += nameHash << 8;
+-                fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                    personalityValue += nameHash << 8;
++                    fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
++                    CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                }
+                 break;
+             }
+             case F_TRAINER_PARTY_CUSTOM_MOVESET:
+             {
+                 const struct TrainerMonNoItemCustomMoves *partyData = gTrainers[trainerNum].party.NoItemCustomMoves;
++                u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                    nameHash += gSpeciesNames[species][j];
+ 
+                 personalityValue += nameHash << 8;
+                 fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
+ 
+-                for (j = 0; j < MAX_MON_MOVES; j++)
++                if (species == partyData[i].species)
+                 {
+-                    SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
+-                    SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    for (j = 0; j < MAX_MON_MOVES; j++)
++                    {
++                        SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
++                        SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    }
+                 }
+                 break;
+             }
+@@ -2036,12 +2062,15 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+             {
+                 const struct TrainerMonItemDefaultMoves *partyData = gTrainers[trainerNum].party.ItemDefaultMoves;
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                {
++                    u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
++                    for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                        nameHash += gSpeciesNames[species][j];
+ 
+-                personalityValue += nameHash << 8;
+-                fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                    personalityValue += nameHash << 8;
++                    fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
++                    CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                }
+ 
+                 SetMonData(&party[i], MON_DATA_HELD_ITEM, &partyData[i].heldItem);
+                 break;
+@@ -2049,20 +2078,24 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+             case F_TRAINER_PARTY_CUSTOM_MOVESET | F_TRAINER_PARTY_HELD_ITEM:
+             {
+                 const struct TrainerMonItemCustomMoves *partyData = gTrainers[trainerNum].party.ItemCustomMoves;
++                u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                    nameHash += gSpeciesNames[species][j];
+ 
+                 personalityValue += nameHash << 8;
+                 fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
+ 
+                 SetMonData(&party[i], MON_DATA_HELD_ITEM, &partyData[i].heldItem);
+ 
+-                for (j = 0; j < MAX_MON_MOVES; j++)
++                if (species == partyData[i].species)
+                 {
+-                    SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
+-                    SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    for (j = 0; j < MAX_MON_MOVES; j++)
++                    {
++                        SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
++                        SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    }
+                 }
+                 break;
+             }
+@@ -2075,6 +2108,20 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+     return gTrainers[trainerNum].partySize;
+ }
+ 
++#if WASM
++u32 WasmRunTestCreateTrainerParty(u16 trainerId)
++{
++    u32 previousFlags = gBattleTypeFlags;
++    u8 count;
++    if (trainerId >= TRAINER_SECRET_BASE)
++        return 0;
++    gBattleTypeFlags |= BATTLE_TYPE_TRAINER;
++    count = CreateNPCTrainerParty(gEnemyParty, trainerId, TRUE);
++    gBattleTypeFlags = previousFlags;
++    return count;
++}
++#endif
++
+ static void UNUSED HBlankCB_Battle(void)
+ {
+     if (REG_VCOUNT < DISPLAY_HEIGHT && REG_VCOUNT >= 111)
+diff --git a/src/battle_message.c b/src/battle_message.c
+index c89dd7b..6fb5a10 100644
+--- a/src/battle_message.c
++++ b/src/battle_message.c
+@@ -462,6 +462,7 @@ static const u8 sText_PlayerUsedItem[] = _("{B_PLAYER_NAME} used\n{B_LAST_ITEM}!
+ static const u8 sText_WallyUsedItem[] = _("WALLY used\n{B_LAST_ITEM}!");
+ static const u8 sText_Trainer1UsedItem[] = _("{B_TRAINER1_CLASS} {B_TRAINER1_NAME}\nused {B_LAST_ITEM}!");
+ static const u8 sText_TrainerBlockedBall[] = _("The TRAINER blocked the BALL!");
++static const u8 sText_RunCaptureBlocked[] = _("This run's rules prevent the capture!");
+ static const u8 sText_DontBeAThief[] = _("Don't be a thief!");
+ static const u8 sText_ItDodgedBall[] = _("It dodged the thrown BALL!\nThis POKéMON can't be caught!");
+ static const u8 sText_YouMissedPkmn[] = _("You missed the POKéMON!");
+@@ -764,6 +765,7 @@ const u8 *const gBattleStringsTable[BATTLESTRINGS_COUNT - BATTLESTRINGS_TABLE_ST
+     [STRINGID_PLAYERUSEDITEM - BATTLESTRINGS_TABLE_START] = sText_PlayerUsedItem,
+     [STRINGID_WALLYUSEDITEM - BATTLESTRINGS_TABLE_START] = sText_WallyUsedItem,
+     [STRINGID_TRAINERBLOCKEDBALL - BATTLESTRINGS_TABLE_START] = sText_TrainerBlockedBall,
++    [STRINGID_RUNCAPTUREBLOCKED - BATTLESTRINGS_TABLE_START] = sText_RunCaptureBlocked,
+     [STRINGID_DONTBEATHIEF - BATTLESTRINGS_TABLE_START] = sText_DontBeAThief,
+     [STRINGID_ITDODGEDBALL - BATTLESTRINGS_TABLE_START] = sText_ItDodgedBall,
+     [STRINGID_YOUMISSEDPKMN - BATTLESTRINGS_TABLE_START] = sText_YouMissedPkmn,
+diff --git a/src/battle_script_commands.c b/src/battle_script_commands.c
+index e8ad61d..bab6b92 100644
+--- a/src/battle_script_commands.c
++++ b/src/battle_script_commands.c
+@@ -36,6 +36,9 @@
+ #include "battle_pyramid.h"
+ #include "field_specials.h"
+ #include "pokemon_summary_screen.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "pokenav.h"
+ #include "menu_specialized.h"
+ #include "data.h"
+@@ -3010,6 +3013,12 @@ static void Cmd_tryfaintmon(void)
+                 if (gBattleResults.playerFaintCounter < 255)
+                     gBattleResults.playerFaintCounter++;
+                 AdjustFriendshipOnBattleFaint(gActiveBattler);
++#if WASM
++                WasmRunOnFaint(
++                    gBattleMons[gActiveBattler].personality & 0xffff,
++                    gBattleMons[gActiveBattler].personality >> 16,
++                    gCurrentMove);
++#endif
+             }
+             else
+             {
+@@ -3252,6 +3261,46 @@ static void Cmd_jumpiftype(void)
+         gBattlescriptCurrInstr += 7;
+ }
+ 
++#if WASM
++static u32 ClampRunExperienceGain(u16 species, u32 currentExp, u32 expGain, u32 levelCap)
++{
++    u32 nextLevel;
++    u32 capExp;
++    if (levelCap == 0 || levelCap >= MAX_LEVEL || species == SPECIES_NONE)
++        return expGain;
++    nextLevel = levelCap + 1;
++    capExp = gExperienceTables[gSpeciesInfo[species].growthRate][nextLevel];
++    if (capExp > 0)
++        capExp--;
++    if (currentExp >= capExp)
++        return 0;
++    if (expGain > capExp - currentExp)
++        return capExp - currentExp;
++    return expGain;
++}
++
++u32 WasmRunDebugApplyExpGain(u32 index, u32 expGain)
++{
++    struct Pokemon *mon;
++    u16 species;
++    u32 currentExp;
++    u32 gained;
++    u32 nextExp;
++    if (index >= PARTY_SIZE)
++        return 0;
++    mon = &gPlayerParty[index];
++    species = GetMonData(mon, MON_DATA_SPECIES, NULL);
++    if (species == SPECIES_NONE)
++        return 0;
++    currentExp = GetMonData(mon, MON_DATA_EXP, NULL);
++    gained = ClampRunExperienceGain(species, currentExp, expGain, WasmRunGymLevelCap());
++    nextExp = currentExp + gained;
++    SetMonData(mon, MON_DATA_EXP, &nextExp);
++    CalculateMonStats(mon);
++    return GetMonData(mon, MON_DATA_LEVEL, NULL);
++}
++#endif
++
+ static void Cmd_getexp(void)
+ {
+     u16 item;
+@@ -3260,6 +3309,9 @@ static void Cmd_getexp(void)
+     s32 sentIn;
+     s32 viaExpShare = 0;
+     u16 *exp = &gBattleStruct->expValue;
++#if WASM
++    u32 runLevelCap = WasmRunGymLevelCap();
++#endif
+ 
+     gBattlerFainted = GetBattlerForBattleScript(gBattlescriptCurrInstr[1]);
+     sentIn = gSentPokesToOpponent[(gBattlerFainted & 2) >> 1];
+@@ -3348,7 +3400,11 @@ static void Cmd_getexp(void)
+                 gBattleScripting.getexpState = 5;
+                 gBattleMoveDamage = 0; // used for exp
+             }
+-            else if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) == MAX_LEVEL)
++            else if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) == MAX_LEVEL
++#if WASM
++                || (runLevelCap > 0 && GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) >= runLevelCap)
++#endif
++            )
+             {
+                 *(&gBattleStruct->sentInPokes) >>= 1;
+                 gBattleScripting.getexpState = 5;
+@@ -3396,6 +3452,14 @@ static void Cmd_getexp(void)
+                         i = STRINGID_EMPTYSTRING4;
+                     }
+ 
++#if WASM
++                    gBattleMoveDamage = ClampRunExperienceGain(
++                        GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_SPECIES, NULL),
++                        GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_EXP, NULL),
++                        gBattleMoveDamage,
++                        runLevelCap);
++#endif
++
+                     // get exp getter battler
+                     if (gBattleTypeFlags & BATTLE_TYPE_DOUBLE)
+                     {
+@@ -9912,6 +9976,22 @@ static void Cmd_handleballthrow(void)
+     gActiveBattler = gBattlerAttacker;
+     gBattlerTarget = BATTLE_OPPOSITE(gBattlerAttacker);
+ 
++#if WASM
++    if (!(gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_WALLY_TUTORIAL))
++        && !WasmRunAllowCapture(WasmRunMapSection(),
++            gBattleMons[gBattlerTarget].species,
++            gBattleMons[gBattlerTarget].personality & 0xffff,
++            gBattleMons[gBattlerTarget].personality >> 16))
++    {
++        if (gMain.inBattle && gLastUsedItem != ITEM_NONE)
++            AddBagItem(gLastUsedItem, 1);
++        BtlController_EmitBallThrowAnim(B_COMM_TO_CONTROLLER, BALL_TRAINER_BLOCK);
++        MarkBattlerForControllerExec(gActiveBattler);
++        gBattlescriptCurrInstr = BattleScript_RunCaptureBlocked;
++        return;
++    }
++#endif
++
+     if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+     {
+         BtlController_EmitBallThrowAnim(B_COMM_TO_CONTROLLER, BALL_TRAINER_BLOCK);
+@@ -10059,9 +10139,68 @@ static void Cmd_handleballthrow(void)
+     }
+ }
+ 
++#if WASM
++// Automation-only conformance probe. Run the real command through its blocked
++// branch, then restore controller/battle scratch state so this probe cannot
++// perturb the active field simulation.
++u32 WasmRunDebugTryBlockedBallThrow(u16 species, u32 pidLo, u32 pidHi)
++{
++    struct BattlePokemon savedTarget = gBattleMons[1];
++    const u8 *savedScript = gBattlescriptCurrInstr;
++    u32 savedBattleTypeFlags = gBattleTypeFlags;
++    u32 savedControllerExecFlags = gBattleControllerExecFlags;
++    u16 savedLastUsedItem = gLastUsedItem;
++    u8 savedAttacker = gBattlerAttacker;
++    u8 savedTargetBattler = gBattlerTarget;
++    u8 savedActiveBattler = gActiveBattler;
++    u8 savedBattleBuffer[0x200];
++    u16 i;
++    u32 wasBlocked;
++
++    for (i = 0; i < sizeof(savedBattleBuffer); i++)
++        savedBattleBuffer[i] = gBattleBufferA[0][i];
++    gBattleTypeFlags = 0;
++    gBattleControllerExecFlags = 0;
++    gBattlerAttacker = 0;
++    gActiveBattler = 0;
++    gLastUsedItem = ITEM_POKE_BALL;
++    gBattleMons[1].species = species;
++    gBattleMons[1].personality = (pidLo & 0xffff) | ((pidHi & 0xffff) << 16);
++    Cmd_handleballthrow();
++    wasBlocked = gBattlescriptCurrInstr == BattleScript_RunCaptureBlocked;
++
++    for (i = 0; i < sizeof(savedBattleBuffer); i++)
++        gBattleBufferA[0][i] = savedBattleBuffer[i];
++    gBattleMons[1] = savedTarget;
++    gBattlescriptCurrInstr = savedScript;
++    gBattleTypeFlags = savedBattleTypeFlags;
++    gBattleControllerExecFlags = savedControllerExecFlags;
++    gLastUsedItem = savedLastUsedItem;
++    gBattlerAttacker = savedAttacker;
++    gBattlerTarget = savedTargetBattler;
++    gActiveBattler = savedActiveBattler;
++    return wasBlocked;
++}
++#endif
++
+ static void Cmd_givecaughtmon(void)
+ {
+-    if (GiveMonToPlayer(&gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]]) != MON_GIVEN_TO_PARTY)
++    struct Pokemon *caughtMon = &gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]];
++#if WASM
++    WasmRunAutoLevelCaughtMon(caughtMon);
++#endif
++    u8 result = GiveMonToPlayer(caughtMon);
++#if WASM
++    if (result != MON_CANT_GIVE)
++    {
++        u32 personality = GetMonData(caughtMon, MON_DATA_PERSONALITY, NULL);
++        WasmRunOnCapture(WasmRunMapSection(), WasmRunMapSection(),
++            GetMonData(caughtMon, MON_DATA_SPECIES, NULL),
++            GetMonData(caughtMon, MON_DATA_LEVEL, NULL),
++            personality & 0xffff, personality >> 16);
++    }
++#endif
++    if (result != MON_GIVEN_TO_PARTY)
+     {
+         if (!ShouldShowBoxWasFullMessage())
+         {
+@@ -10089,6 +10228,41 @@ static void Cmd_givecaughtmon(void)
+     gBattlescriptCurrInstr++;
+ }
+ 
++#if WASM
++// Automation-only acceptance probe for the same pre-capture gate and
++// GiveMonToPlayer/OnCapture path used after a successful ball throw.
++u32 WasmRunDebugAcceptWildCapture(void)
++{
++    struct Pokemon *caughtMon = &gEnemyParty[0];
++    u16 species = GetMonData(caughtMon, MON_DATA_SPECIES, NULL);
++    u32 personality = GetMonData(caughtMon, MON_DATA_PERSONALITY, NULL);
++    u32 sectionId = WasmRunMapSection();
++    struct BattleResults savedResults = gBattleResults;
++    const u8 *savedScript = gBattlescriptCurrInstr;
++    u8 savedBattlerAttacker = gBattlerAttacker;
++    u8 savedPartyIndex = gBattlerPartyIndexes[1];
++    static const u8 sTestScript[2] = { 0, 0 };
++    u8 result;
++
++    if (species == SPECIES_NONE || !WasmRunAllowCapture(sectionId, species, personality & 0xffff, personality >> 16))
++        return MON_CANT_GIVE;
++
++    // Exercise the production caught-mon script command and its SoulLink
++    // notification, restoring battle scratch state after the test handoff.
++    gBattlerAttacker = 0;
++    gBattlerPartyIndexes[1] = 0;
++    gBattlescriptCurrInstr = sTestScript;
++    Cmd_givecaughtmon();
++    result = GetMonData(&gPlayerParty[CalculatePlayerPartyCount() - 1], MON_DATA_SPECIES, NULL) == species
++        ? MON_GIVEN_TO_PARTY : MON_CANT_GIVE;
++    gBattleResults = savedResults;
++    gBattlescriptCurrInstr = savedScript;
++    gBattlerAttacker = savedBattlerAttacker;
++    gBattlerPartyIndexes[1] = savedPartyIndex;
++    return result;
++}
++#endif
++
+ static void Cmd_trysetcaughtmondexflags(void)
+ {
+     u16 species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL);
+diff --git a/src/battle_util.c b/src/battle_util.c
+index 2032f8c..a2bfa96 100644
+--- a/src/battle_util.c
++++ b/src/battle_util.c
+@@ -3912,12 +3912,17 @@ u8 GetMoveTarget(u16 move, u8 setTarget)
+ 
+ static bool32 IsBattlerModernFatefulEncounter(u8 battler)
+ {
++#if WASM
++    (void)battler;
++    return TRUE;
++#else
+     if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
+         return TRUE;
+     if (GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES, NULL) != SPECIES_DEOXYS
+         && GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES, NULL) != SPECIES_MEW)
+             return TRUE;
+     return GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_MODERN_FATEFUL_ENCOUNTER, NULL);
++#endif
+ }
+ 
+ u8 IsMonDisobedient(void)
+diff --git a/src/field_poison.c b/src/field_poison.c
+index 1b8ae94..4d4c96f 100644
+--- a/src/field_poison.c
++++ b/src/field_poison.c
+@@ -16,6 +16,9 @@
+ #include "trainer_hill.h"
+ #include "constants/field_poison.h"
+ #include "constants/party_menu.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ 
+ static bool32 IsMonValidSpecies(struct Pokemon *pokemon)
+ {
+@@ -102,6 +105,9 @@ static void Task_TryFieldPoisonWhiteOut(u8 taskId)
+         {
+             gSpecialVar_Result = FLDPSN_NO_WHITEOUT;
+         }
++#if WASM
++        WasmRunProcessSafePoint(0);
++#endif
+         ScriptContext_Enable();
+         DestroyTask(taskId);
+         break;
+diff --git a/src/field_specials.c b/src/field_specials.c
+index f390199..9a4a6dc 100644
+--- a/src/field_specials.c
++++ b/src/field_specials.c
+@@ -21,6 +21,7 @@
+ #include "item_icon.h"
+ #include "link.h"
+ #include "list_menu.h"
++#include "load_save.h"
+ #include "main.h"
+ #include "mystery_gift.h"
+ #include "match_call.h"
+@@ -1423,6 +1424,7 @@ void SetShoalItemFlag(u16 unused)
+ void LoadWallyZigzagoon(void)
+ {
+     u16 monData;
++    BackupPlayerPartyForWallyTutorial();
+     CreateMon(&gPlayerParty[0], SPECIES_ZIGZAGOON, 7, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
+     monData = TRUE;
+     SetMonData(&gPlayerParty[0], MON_DATA_ABILITY_NUM, &monData);
+diff --git a/src/load_save.c b/src/load_save.c
+index 117ba3e..3dc1247 100644
+--- a/src/load_save.c
++++ b/src/load_save.c
+@@ -35,6 +35,9 @@ EWRAM_DATA struct PokemonStorageASLR gPokemonStorage = {0};
+ 
+ EWRAM_DATA struct LoadedSaveData gLoadedSaveData = {0};
+ EWRAM_DATA u32 gLastEncryptionKey = 0;
++static EWRAM_DATA struct Pokemon sWallySavedSlot0 = {0};
++static EWRAM_DATA u8 sWallySavedPartyCount = 0;
++static EWRAM_DATA bool8 sWallyTutorialPartyActive = FALSE;
+ 
+ // IWRAM common
+ COMMON_DATA bool32 gFlashMemoryPresent = 0;
+@@ -63,6 +66,7 @@ void ClearSav2(void)
+ 
+ void ClearSav1(void)
+ {
++    ClearWallyTutorialPartyBackup();
+     CpuFill16(0, &gSaveblock1, sizeof(struct SaveBlock1ASLR));
+ }
+ 
+@@ -157,6 +161,38 @@ void ClearContinueGameWarpStatus2(void)
+     gSaveBlock2Ptr->specialSaveWarpFlags &= ~CONTINUE_GAME_WARP;
+ }
+ 
++void ClearWallyTutorialPartyBackup(void)
++{
++    sWallyTutorialPartyActive = FALSE;
++    sWallySavedPartyCount = 0;
++    ZeroMonData(&sWallySavedSlot0);
++}
++
++void BackupPlayerPartyForWallyTutorial(void)
++{
++    if (!sWallyTutorialPartyActive)
++    {
++        sWallySavedSlot0 = gPlayerParty[0];
++        sWallySavedPartyCount = gPlayerPartyCount;
++        sWallyTutorialPartyActive = TRUE;
++    }
++}
++
++bool8 IsWallyTutorialPartyActive(void)
++{
++    return sWallyTutorialPartyActive;
++}
++
++struct Pokemon *GetWallyTutorialSavedSlot0(void)
++{
++    return &sWallySavedSlot0;
++}
++
++u8 GetWallyTutorialSavedPartyCount(void)
++{
++    return sWallySavedPartyCount;
++}
++
+ void SavePlayerParty(void)
+ {
+     int i;
+@@ -165,12 +201,29 @@ void SavePlayerParty(void)
+ 
+     for (i = 0; i < PARTY_SIZE; i++)
+         gSaveBlock1Ptr->playerParty[i] = gPlayerParty[i];
++
++    // If a save happens while Wally's tutorial Zigzagoon occupies gPlayerParty[0],
++    // never overwrite the player's backed-up slot 0 in SaveBlock1.
++    if (sWallyTutorialPartyActive)
++    {
++        gSaveBlock1Ptr->playerParty[0] = sWallySavedSlot0;
++        if (sWallySavedPartyCount > 0)
++            gSaveBlock1Ptr->playerPartyCount = sWallySavedPartyCount;
++    }
+ }
+ 
+ void LoadPlayerParty(void)
+ {
+     int i;
+ 
++    if (sWallyTutorialPartyActive)
++    {
++        gSaveBlock1Ptr->playerParty[0] = sWallySavedSlot0;
++        if (sWallySavedPartyCount > 0)
++            gSaveBlock1Ptr->playerPartyCount = sWallySavedPartyCount;
++        ClearWallyTutorialPartyBackup();
++    }
++
+     gPlayerPartyCount = gSaveBlock1Ptr->playerPartyCount;
+ 
+     for (i = 0; i < PARTY_SIZE; i++)
+@@ -201,6 +254,7 @@ void CopyPartyAndObjectsToSave(void)
+ 
+ void CopyPartyAndObjectsFromSave(void)
+ {
++    ClearWallyTutorialPartyBackup();
+     LoadPlayerParty();
+     LoadObjectEvents();
+ }
+diff --git a/src/m4a.c b/src/m4a.c
+index 67395f0..0cb1fc7 100644
+--- a/src/m4a.c
++++ b/src/m4a.c
+@@ -3,7 +3,10 @@
+ #include "constants/songs.h"
+ 
+ #if WASM
+-#include "wasm_sound.h"
++#undef NUM_MUSIC_PLAYERS
++#undef MAX_LINES
++#define NUM_MUSIC_PLAYERS 4
++#define MAX_LINES 0
+ #endif
+ 
+ extern const u8 gCgb3Vol[];
+@@ -25,210 +28,6 @@ COMMON_DATA struct PokemonCrySong gPokemonCrySong = {0};
+ COMMON_DATA u8 gMPlayMemAccArea[0x10] = {0};
+ COMMON_DATA struct MusicPlayerInfo gMPlayInfo_SE3 = {0};
+ 
+-#if WASM
+-static u16 sWasmMPlayFrames[4];
+-static u16 sWasmMPlaySongs[4];
+-
+-static u8 WasmMPlayIndex(struct MusicPlayerInfo *mplayInfo)
+-{
+-    if (mplayInfo == &gMPlayInfo_BGM)
+-        return WASM_MUSIC_PLAYER_BGM;
+-    if (mplayInfo == &gMPlayInfo_SE1)
+-        return WASM_MUSIC_PLAYER_SE1;
+-    if (mplayInfo == &gMPlayInfo_SE2)
+-        return WASM_MUSIC_PLAYER_SE2;
+-    if (mplayInfo == &gMPlayInfo_SE3)
+-        return WASM_MUSIC_PLAYER_SE3;
+-    return 0xFF;
+-}
+-
+-static struct MusicPlayerInfo *WasmMPlayInfoForPlayer(u8 player)
+-{
+-    switch (player)
+-    {
+-    case WASM_MUSIC_PLAYER_BGM:
+-        return &gMPlayInfo_BGM;
+-    case WASM_MUSIC_PLAYER_SE1:
+-        return &gMPlayInfo_SE1;
+-    case WASM_MUSIC_PLAYER_SE2:
+-        return &gMPlayInfo_SE2;
+-    case WASM_MUSIC_PLAYER_SE3:
+-        return &gMPlayInfo_SE3;
+-    }
+-
+-    return NULL;
+-}
+-
+-static void WasmMPlayInit(struct MusicPlayerInfo *mplayInfo)
+-{
+-    u8 index;
+-
+-    if (mplayInfo == NULL)
+-        return;
+-
+-    index = WasmMPlayIndex(mplayInfo);
+-    if (index != 0xFF)
+-    {
+-        sWasmMPlayFrames[index] = 0;
+-        sWasmMPlaySongs[index] = MUS_NONE;
+-    }
+-
+-    mplayInfo->ident = ID_NUMBER;
+-    mplayInfo->status = 0;
+-}
+-
+-static void WasmMPlayStart(struct MusicPlayerInfo *mplayInfo, u16 frames, u16 songNum)
+-{
+-    u8 index;
+-
+-    if (mplayInfo == NULL)
+-        return;
+-
+-    index = WasmMPlayIndex(mplayInfo);
+-    if (index != 0xFF)
+-    {
+-        sWasmMPlayFrames[index] = frames;
+-        sWasmMPlaySongs[index] = songNum;
+-    }
+-
+-    mplayInfo->ident = ID_NUMBER;
+-    mplayInfo->status = MUSICPLAYER_STATUS_TRACK;
+-}
+-
+-static void WasmMPlayStop(struct MusicPlayerInfo *mplayInfo)
+-{
+-    u8 index;
+-
+-    if (mplayInfo == NULL)
+-        return;
+-
+-    index = WasmMPlayIndex(mplayInfo);
+-    if (index != 0xFF)
+-    {
+-        sWasmMPlayFrames[index] = 0;
+-        sWasmMPlaySongs[index] = MUS_NONE;
+-    }
+-
+-    mplayInfo->ident = ID_NUMBER;
+-    mplayInfo->status = 0;
+-}
+-
+-static void WasmMPlayContinue(struct MusicPlayerInfo *mplayInfo)
+-{
+-    if (mplayInfo != NULL && mplayInfo->ident == ID_NUMBER)
+-        mplayInfo->status = MUSICPLAYER_STATUS_TRACK;
+-}
+-
+-static void WasmMPlayPause(struct MusicPlayerInfo *mplayInfo)
+-{
+-    if (mplayInfo != NULL && mplayInfo->ident == ID_NUMBER && (mplayInfo->status & MUSICPLAYER_STATUS_TRACK))
+-        mplayInfo->status |= MUSICPLAYER_STATUS_PAUSE;
+-}
+-
+-static void WasmMPlayTick(struct MusicPlayerInfo *mplayInfo)
+-{
+-    u8 index = WasmMPlayIndex(mplayInfo);
+-
+-    if (index == 0xFF || sWasmMPlayFrames[index] == 0)
+-        return;
+-
+-    sWasmMPlayFrames[index]--;
+-    if (sWasmMPlayFrames[index] == 0)
+-        WasmMPlayStop(mplayInfo);
+-}
+-
+-static void WasmSongStart(u16 songNum)
+-{
+-    const struct WasmSongInfo *song;
+-
+-    if (songNum >= WASM_SONG_COUNT)
+-        return;
+-
+-    song = &gWasmSongInfo[songNum];
+-    WasmMPlayStart(WasmMPlayInfoForPlayer(song->player), song->duration, songNum);
+-}
+-
+-static void WasmSongStop(u16 songNum)
+-{
+-    u8 player;
+-    struct MusicPlayerInfo *mplayInfo;
+-
+-    if (songNum >= WASM_SONG_COUNT)
+-        return;
+-
+-    player = gWasmSongInfo[songNum].player;
+-    mplayInfo = WasmMPlayInfoForPlayer(player);
+-    if (sWasmMPlaySongs[player] == songNum)
+-        WasmMPlayStop(mplayInfo);
+-}
+-
+-void m4aSoundVSync(void) {}
+-void m4aSoundVSyncOn(void) {}
+-void m4aSoundVSyncOff(void) {}
+-void m4aSoundInit(void)
+-{
+-    SoundInit(&gSoundInfo);
+-    WasmMPlayInit(&gMPlayInfo_BGM);
+-    WasmMPlayInit(&gMPlayInfo_SE1);
+-    WasmMPlayInit(&gMPlayInfo_SE2);
+-    WasmMPlayInit(&gMPlayInfo_SE3);
+-}
+-void m4aSoundMain(void)
+-{
+-    WasmMPlayTick(&gMPlayInfo_BGM);
+-    WasmMPlayTick(&gMPlayInfo_SE1);
+-    WasmMPlayTick(&gMPlayInfo_SE2);
+-    WasmMPlayTick(&gMPlayInfo_SE3);
+-}
+-void m4aSoundMode(u32 mode) {}
+-void m4aSongNumStart(u16 n) { WasmSongStart(n); }
+-void m4aSongNumStartOrChange(u16 n) { WasmSongStart(n); }
+-void m4aSongNumStop(u16 n) { WasmSongStop(n); }
+-void m4aMPlayAllStop(void)
+-{
+-    s32 i;
+-
+-    WasmMPlayStop(&gMPlayInfo_BGM);
+-    WasmMPlayStop(&gMPlayInfo_SE1);
+-    WasmMPlayStop(&gMPlayInfo_SE2);
+-    WasmMPlayStop(&gMPlayInfo_SE3);
+-    for (i = 0; i < MAX_POKEMON_CRIES; i++)
+-        WasmMPlayStop(&gPokemonCryMusicPlayers[i]);
+-}
+-void m4aMPlayContinue(struct MusicPlayerInfo *mplayInfo) { WasmMPlayContinue(mplayInfo); }
+-void m4aMPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayStop(mplayInfo); }
+-void m4aMPlayFadeOutTemporarily(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayPause(mplayInfo); }
+-void m4aMPlayFadeIn(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayContinue(mplayInfo); }
+-void m4aMPlayImmInit(struct MusicPlayerInfo *mplayInfo) {}
+-void m4aMPlayStop(struct MusicPlayerInfo *mplayInfo) { WasmMPlayStop(mplayInfo); }
+-void m4aMPlayTempoControl(struct MusicPlayerInfo *mplayInfo, u16 tempo) {}
+-void m4aMPlayVolumeControl(struct MusicPlayerInfo *mplayInfo, u16 trackBits, u16 volume) {}
+-void m4aMPlayPitchControl(struct MusicPlayerInfo *mplayInfo, u16 trackBits, s16 pitch) {}
+-void m4aMPlayPanpotControl(struct MusicPlayerInfo *mplayInfo, u16 trackBits, s8 pan) {}
+-void m4aMPlayModDepthSet(struct MusicPlayerInfo *mplayInfo, u16 trackBits, u8 modDepth) {}
+-void m4aMPlayLFOSpeedSet(struct MusicPlayerInfo *mplayInfo, u16 trackBits, u8 lfoSpeed) {}
+-void MPlayContinue(struct MusicPlayerInfo *mplayInfo) { WasmMPlayContinue(mplayInfo); }
+-void MPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayStop(mplayInfo); }
+-void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader) { WasmMPlayStart(mplayInfo, 0, MUS_NONE); }
+-void MPlayMain(struct MusicPlayerInfo *mplayInfo) {}
+-void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *tracks, u8 trackCount)
+-{
+-    WasmMPlayInit(mplayInfo);
+-    if (mplayInfo != NULL)
+-    {
+-        mplayInfo->tracks = tracks;
+-        mplayInfo->trackCount = trackCount;
+-    }
+-}
+-void MPlayExtender(struct CgbChannel *cgbChans) {}
+-void MPlayJumpTableCopy(MPlayFunc *mplayJumpTable) {}
+-void SoundInit(struct SoundInfo *soundInfo) { if (soundInfo != NULL) soundInfo->ident = ID_NUMBER; }
+-void SoundMain(void) {}
+-void SoundMainBTM(void) {}
+-u32 MidiKeyToFreq(struct WaveData *wav, u8 key, u8 fineAdjust) { return 0; }
+-void SetPokemonCryPriority(u8 val) { gPokemonCrySong.priority = val; }
+-#else
+-
+ u32 MidiKeyToFreq(struct WaveData *wav, u8 key, u8 fineAdjust)
+ {
+     u32 val1;
+@@ -280,7 +79,9 @@ void m4aSoundInit(void)
+ {
+     s32 i;
+ 
++#if !WASM
+     CpuCopy32((void *)((s32)SoundMainRAM & ~1), SoundMainRAM_Buffer, sizeof(SoundMainRAM_Buffer));
++#endif
+ 
+     SoundInit(&gSoundInfo);
+     MPlayExtender(gCgbChans);
+@@ -536,27 +337,37 @@ void MPlayExtender(struct CgbChannel *cgbChans)
+ 
+ static void UNUSED MusicPlayerJumpTableCopy(void)
+ {
++#if !WASM
+     asm("swi 0x2A");
++#endif
+ }
+ 
+ void ClearChain(void *x)
+ {
++#if WASM
++    RealClearChain(x);
++#else
+ #if __STDC_VERSION__ < 202311L
+     void (*func)(void *) = *(&gMPlayJumpTable[34]);
+ #else
+     void (*func)(...) = *(&gMPlayJumpTable[34]);
+ #endif
+     func(x);
++#endif
+ }
+ 
+ void Clear64byte(void *x)
+ {
++#if WASM
++    CpuFill32(0, x, 64);
++#else
+ #if __STDC_VERSION__ < 202311L
+     void (*func)(void *) = *(&gMPlayJumpTable[35]);
+ #else
+     void (*func)(...) = *(&gMPlayJumpTable[35]);
+ #endif
+     func(x);
++#endif
+ }
+ 
+ void SoundInit(struct SoundInfo *soundInfo)
+@@ -629,11 +440,13 @@ void SampleFreqSet(u32 freq)
+ 
+     m4aSoundVSyncOn();
+ 
++#if !WASM
+     while (*(vu8 *)REG_ADDR_VCOUNT == 159)
+         ;
+ 
+     while (*(vu8 *)REG_ADDR_VCOUNT != 159)
+         ;
++#endif
+ 
+     REG_TM0CNT_H = TIMER_ENABLE | TIMER_1CLK;
+ }
+@@ -1720,8 +1533,12 @@ void ply_memacc(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *trac
+ 
+ cond_true:
+     {
++#if WASM
++        ply_goto(mplayInfo, track);
++#else
+         // *& is required for matching
+         (*&gMPlayJumpTable[1])(mplayInfo, track);
++#endif
+         return;
+     }
+ 
+@@ -1739,7 +1556,11 @@ void ply_xcmd(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track)
+ 
+ void ply_xxx(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track)
+ {
++#if WASM
++    ply_fine(mplayInfo, track);
++#else
+     gMPlayJumpTable[0](mplayInfo, track);
++#endif
+ }
+ 
+ #define READ_XCMD_BYTE(var, n)       \
+@@ -1988,4 +1809,3 @@ void SetPokemonCryPriority(u8 val)
+ {
+     gPokemonCrySong.priority = val;
+ }
+-#endif
+diff --git a/src/main.c b/src/main.c
+index 15df360..6b58d74 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -106,6 +106,7 @@ void AgbMain(void)
+     InitKeys();
+     InitIntrHandlers();
+ #if WASM
++    m4aSoundInit();
+     gFlashMemoryPresent = TRUE;
+ #else
+     m4aSoundInit();
+@@ -423,9 +424,18 @@ static void VBlankIntr(void)
+     CopyBufferedValuesToGpuRegs();
+     ProcessDma3Requests();
+ 
++#if WASM
++    m4aSoundVSync();
++#endif
+     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
+ 
+     m4aSoundMain();
++#if WASM
++    {
++        extern void WasmAudioRenderFrame(void);
++        WasmAudioRenderFrame();
++    }
++#endif
+     TryReceiveLinkBattleData();
+ 
+     if (!gMain.inBattle || !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_RECORDED)))
+diff --git a/src/overworld.c b/src/overworld.c
+index 05f5bc5..8617dfb 100644
+--- a/src/overworld.c
++++ b/src/overworld.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "battle.h"
+ #include "overworld.h"
+ #include "battle_pyramid.h"
+ #include "battle_setup.h"
+@@ -63,6 +64,9 @@
+ #include "constants/layouts.h"
+ #include "constants/map_types.h"
+ #include "constants/region_map_sections.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "constants/songs.h"
+ #include "constants/trainer_hill.h"
+ #include "constants/weather.h"
+@@ -357,6 +361,11 @@ static void (*const sMovementStatusHandler[])(struct LinkPlayerObjectEvent *, st
+ // code
+ void DoWhiteOut(void)
+ {
++#if WASM
++    // Run-dead Pokémon must be removed before vanilla whiteout healing revives
++    // the player's party.
++    WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+     RunScriptImmediately(EventScript_WhiteOut);
+     SetMoney(&gSaveBlock1Ptr->money, GetMoney(&gSaveBlock1Ptr->money) / 2);
+     HealPlayerParty();
+@@ -1556,6 +1565,9 @@ void CB2_WhiteOut(void)
+         FieldClearVBlankHBlankCallbacks();
+         StopMapMusic();
+         ResetSafariZoneFlag_();
++#if WASM
++        WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+         DoWhiteOut();
+         ResetInitialPlayerAvatarState();
+         ScriptContext_Init();
+@@ -1639,6 +1651,9 @@ static void CB2_ReturnToFieldLocal(void)
+ {
+     if (ReturnToFieldLocal(&gMain.state))
+     {
++#if WASM
++        WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+         SetFieldVBlankCallback();
+         SetMainCallback2(CB2_Overworld);
+     }
+@@ -1647,7 +1662,12 @@ static void CB2_ReturnToFieldLocal(void)
+ static void CB2_ReturnToFieldLink(void)
+ {
+     if (!Overworld_IsRecvQueueAtMax() && ReturnToFieldLink(&gMain.state))
++    {
++#if WASM
++        WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+         SetMainCallback2(CB2_Overworld);
++    }
+ }
+ 
+ void CB2_ReturnToFieldFromMultiplayer(void)
+diff --git a/src/party_menu.c b/src/party_menu.c
+index 94de20d..32f8fdd 100755
+--- a/src/party_menu.c
++++ b/src/party_menu.c
+@@ -48,6 +48,9 @@
+ #include "pokemon_icon.h"
+ #include "pokemon_jump.h"
+ #include "pokemon_storage_system.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "pokemon_summary_screen.h"
+ #include "region_map.h"
+ #include "reshow_battle_screen.h"
+@@ -4989,6 +4992,9 @@ void ItemUseCB_RareCandy(u8 taskId, TaskFunc task)
+         PlayFanfareByFanfareNum(FANFARE_LEVEL_UP);
+         UpdateMonDisplayInfoAfterRareCandy(gPartyMenu.slotId, mon);
+         RemoveBagItem(gSpecialVar_ItemId, 1);
++#if WASM
++        WasmRunRefillRareCandy();
++#endif
+         GetMonNickname(mon, gStringVar1);
+         ConvertIntToDecimalStringN(gStringVar2, GetMonData(mon, MON_DATA_LEVEL), STR_CONV_MODE_LEFT_ALIGN, 3);
+         StringExpandPlaceholders(gStringVar4, gText_PkmnElevatedToLvVar2);
+diff --git a/src/pokemon.c b/src/pokemon.c
+index e94eded..f57f3a9 100644
+--- a/src/pokemon.c
++++ b/src/pokemon.c
+@@ -25,6 +25,9 @@
+ #include "pokemon_animation.h"
+ #include "pokemon_summary_screen.h"
+ #include "pokemon_storage_system.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "random.h"
+ #include "recorded_battle.h"
+ #include "rtc.h"
+@@ -2299,6 +2302,14 @@ void CreateBoxMon(struct BoxPokemon *boxMon, u16 species, u8 level, u8 fixedIV,
+         SetBoxMonData(boxMon, MON_DATA_ABILITY_NUM, &value);
+     }
+ 
++#if WASM
++    if (species == SPECIES_MEW || species == SPECIES_DEOXYS)
++    {
++        bool32 isModernFatefulEncounter = TRUE;
++        SetBoxMonData(boxMon, MON_DATA_MODERN_FATEFUL_ENCOUNTER, &isModernFatefulEncounter);
++    }
++#endif
++
+     GiveBoxMonInitialMoveset(boxMon);
+ }
+ 
+@@ -4826,6 +4837,22 @@ bool8 PokemonUseItemEffects(struct Pokemon *mon, u16 item, u8 partyIndex, u8 mov
+         itemEffect = gItemEffectTable[item - ITEM_POTION];
+     }
+ 
++#if WASM
++    if ((item == ITEM_REVIVE || item == ITEM_MAX_REVIVE || item == ITEM_SACRED_ASH
++         || item == ITEM_RARE_CANDY)
++        && !WasmRunAllowItemEffect(
++            GetMonData(mon, MON_DATA_SPECIES, NULL),
++            GetMonData(mon, MON_DATA_PERSONALITY, NULL) & 0xffff,
++            GetMonData(mon, MON_DATA_PERSONALITY, NULL) >> 16,
++            item,
++            GetMonData(mon, MON_DATA_HP, NULL),
++            GetMonData(mon, MON_DATA_LEVEL, NULL),
++            WasmRunHighestLivingPartyLevel(),
++            WasmRunGymLevelCap(),
++            item == ITEM_RARE_CANDY))
++        return TRUE;
++#endif
++
+     // Do item effect
+     for (i = 0; i < ITEM_EFFECT_ARG_START; i++)
+     {
+diff --git a/src/pokemon_storage_system.c b/src/pokemon_storage_system.c
+index e656080..48d1fe9 100644
+--- a/src/pokemon_storage_system.c
++++ b/src/pokemon_storage_system.c
+@@ -41,6 +41,9 @@
+ #include "constants/rgb.h"
+ #include "constants/songs.h"
+ #include "constants/pokemon_icon.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ 
+ /*
+     NOTE: This file is large. Some general groups of functions have
+@@ -660,7 +663,7 @@ static void MoveMon(void);
+ static void PlaceMon(void);
+ static void RefreshDisplayMon(void);
+ static void SetMovingMonData(u8, u8);
+-static void SetPlacedMonData(u8, u8);
++static bool8 SetPlacedMonData(u8, u8);
+ static void PurgeMonOrBoxMon(u8, u8);
+ static void SetShiftedMonData(u8, u8);
+ static bool8 TryStorePartyMonInBox(u8);
+@@ -6334,12 +6337,22 @@ static void PlaceMon(void)
+     switch (sCursorArea)
+     {
+     case CURSOR_AREA_IN_PARTY:
+-        SetPlacedMonData(TOTAL_BOXES_COUNT, sCursorPosition);
++        if (!SetPlacedMonData(TOTAL_BOXES_COUNT, sCursorPosition))
++            return;
+         SetPlacedMonSprite(TOTAL_BOXES_COUNT, sCursorPosition);
+         break;
+     case CURSOR_AREA_IN_BOX:
+         boxId = StorageGetCurrentBox();
+-        SetPlacedMonData(boxId, sCursorPosition);
++        if (!SetPlacedMonData(boxId, sCursorPosition))
++        {
++            if (sMovingMonOrigBoxId == TOTAL_BOXES_COUNT)
++            {
++                SetPlacedMonData(TOTAL_BOXES_COUNT, sMovingMonOrigBoxPos);
++                SetPlacedMonSprite(TOTAL_BOXES_COUNT, sMovingMonOrigBoxPos);
++            }
++            sIsMonBeingMoved = FALSE;
++            return;
++        }
+         SetPlacedMonSprite(boxId, sCursorPosition);
+         break;
+     default:
+@@ -6366,19 +6379,77 @@ static void SetMovingMonData(u8 boxId, u8 position)
+     sMovingMonOrigBoxPos = position;
+ }
+ 
+-static void SetPlacedMonData(u8 boxId, u8 position)
++static bool8 SetPlacedMonData(u8 boxId, u8 position)
+ {
++    // Linked-PC policy applies only when a living party member is actually
++    // committed to a PC box. Picking up/reordering within the party remains
++    // possible; the destination is known here, immediately before mutation.
++    if (boxId != TOTAL_BOXES_COUNT && sMovingMonOrigBoxId == TOTAL_BOXES_COUNT)
++    {
++#if WASM
++        u32 personality = GetMonData(&sStorage->movingMon, MON_DATA_PERSONALITY);
++        if (!WasmRunAllowPcBoxing(personality))
++            return FALSE;
++#endif
++    }
++
+     if (boxId == TOTAL_BOXES_COUNT)
+     {
+         gPlayerParty[position] = sStorage->movingMon;
++#if WASM
++        WasmRunSyncPartyLevels();
++#endif
+     }
+     else
+     {
+         BoxMonRestorePP(&sStorage->movingMon.box);
+         SetBoxMonAt(boxId, position, &sStorage->movingMon.box);
+     }
++    return TRUE;
++}
++
++#if WASM
++u32 WasmRunDebugCanBoxPartyMon(u32 index)
++{
++    u32 personality;
++    if (index >= PARTY_SIZE || GetMonData(&gPlayerParty[index], MON_DATA_SPECIES) == SPECIES_NONE)
++        return FALSE;
++    personality = GetMonData(&gPlayerParty[index], MON_DATA_PERSONALITY);
++    return WasmRunAllowPcBoxing(personality);
+ }
+ 
++// Exercise the same party-to-PC data path as PlaceMon/TryStorePartyMonInBox,
++// but without opening UI or changing the active PC panel. This automation probe
++// is only used to prove that a rejected move leaves both stores unchanged.
++u32 WasmRunDebugTryBoxPartyMon(u32 index)
++{
++    struct PokemonStorageSystemData *savedStorage = sStorage;
++    struct PokemonStorageSystemData *testStorage;
++    u8 boxId;
++    s16 boxPosition;
++    bool8 placed;
++
++    if (index >= PARTY_SIZE || GetMonData(&gPlayerParty[index], MON_DATA_SPECIES) == SPECIES_NONE)
++        return FALSE;
++    boxId = StorageGetCurrentBox();
++    boxPosition = GetFirstFreeBoxSpot(boxId);
++    if (boxPosition < 0)
++        return FALSE;
++    testStorage = Alloc(sizeof(*testStorage));
++    if (testStorage == NULL)
++        return FALSE;
++
++    sStorage = testStorage;
++    SetMovingMonData(TOTAL_BOXES_COUNT, index);
++    placed = SetPlacedMonData(boxId, boxPosition);
++    if (!placed)
++        SetPlacedMonData(TOTAL_BOXES_COUNT, index);
++    sStorage = savedStorage;
++    Free(testStorage);
++    return placed;
++}
++#endif
++
+ static void PurgeMonOrBoxMon(u8 boxId, u8 position)
+ {
+     if (boxId == TOTAL_BOXES_COUNT)
+@@ -6389,12 +6460,15 @@ static void PurgeMonOrBoxMon(u8 boxId, u8 position)
+ 
+ static void SetShiftedMonData(u8 boxId, u8 position)
+ {
++    sMovingMonOrigBoxId = boxId;
++    sMovingMonOrigBoxPos = position;
+     if (boxId == TOTAL_BOXES_COUNT)
+         sStorage->tempMon = gPlayerParty[position];
+     else
+         BoxMonAtToMon(boxId, position, &sStorage->tempMon);
+ 
+-    SetPlacedMonData(boxId, position);
++    if (!SetPlacedMonData(boxId, position))
++        return;
+     sStorage->movingMon = sStorage->tempMon;
+     SetDisplayMonData(&sStorage->movingMon, MODE_PARTY);
+     sMovingMonOrigBoxId = boxId;
+@@ -6409,14 +6483,19 @@ static bool8 TryStorePartyMonInBox(u8 boxId)
+ 
+     if (sIsMonBeingMoved)
+     {
+-        SetPlacedMonData(boxId, boxPosition);
++        if (!SetPlacedMonData(boxId, boxPosition))
++            return FALSE;
+         DestroyMovingMonIcon();
+         sIsMonBeingMoved = FALSE;
+     }
+     else
+     {
+         SetMovingMonData(TOTAL_BOXES_COUNT, sCursorPosition);
+-        SetPlacedMonData(boxId, boxPosition);
++        if (!SetPlacedMonData(boxId, boxPosition))
++        {
++            SetPlacedMonData(TOTAL_BOXES_COUNT, sCursorPosition);
++            return FALSE;
++        }
+         DestroyPartyMonIcon(sCursorPosition);
+     }
+ 
+diff --git a/src/script_pokemon_util.c b/src/script_pokemon_util.c
+index ed28d47..bd070a0 100755
+--- a/src/script_pokemon_util.c
++++ b/src/script_pokemon_util.c
+@@ -6,6 +6,7 @@
+ #include "daycare.h"
+ #include "decompress.h"
+ #include "event_data.h"
++#include "fieldmap.h"
+ #include "international_string_util.h"
+ #include "link.h"
+ #include "link_rfu.h"
+@@ -23,6 +24,9 @@
+ #include "tv.h"
+ #include "constants/items.h"
+ #include "constants/battle_frontier.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ 
+ static void CB2_ReturnFromChooseHalfParty(void);
+ static void CB2_ReturnFromChooseBattleFrontierParty(void);
+@@ -70,6 +74,14 @@ u8 ScriptGiveMon(u16 species, u8 level, u16 item, u32 unused1, u32 unused2, u8 u
+     heldItem[1] = item >> 8;
+     SetMonData(&mon, MON_DATA_HELD_ITEM, heldItem);
+     sentToPc = GiveMonToPlayer(&mon);
++#if WASM
++    if (sentToPc != MON_CANT_GIVE)
++    {
++        u32 personality = GetMonData(&mon, MON_DATA_PERSONALITY, NULL);
++        u32 sectionId = WasmRunMapSection();
++        WasmRunOnGift(sectionId, sectionId, species, level, personality & 0xffff, personality >> 16);
++    }
++#endif
+     nationalDexNum = SpeciesToNationalPokedexNum(species);
+ 
+     // Don't set Pokédex flag for MON_CANT_GIVE
+@@ -92,8 +104,17 @@ u8 ScriptGiveEgg(u16 species)
+     CreateEgg(&mon, species, TRUE);
+     isEgg = TRUE;
+     SetMonData(&mon, MON_DATA_IS_EGG, &isEgg);
+-
+-    return GiveMonToPlayer(&mon);
++    isEgg = GiveMonToPlayer(&mon);
++#if WASM
++    if (isEgg != MON_CANT_GIVE)
++    {
++        u32 personality = GetMonData(&mon, MON_DATA_PERSONALITY, NULL);
++        u32 sectionId = WasmRunMapSection();
++        WasmRunOnGift(sectionId, sectionId, species,
++            GetMonData(&mon, MON_DATA_LEVEL, NULL), personality & 0xffff, personality >> 16);
++    }
++#endif
++    return isEgg;
+ }
+ 
+ void HasEnoughMonsForDoubleBattle(void)
+diff --git a/src/wasm_display.c b/src/wasm_display.c
+index c9224c6..8f41e1f 100644
+--- a/src/wasm_display.c
++++ b/src/wasm_display.c
+@@ -587,14 +587,14 @@ static bool8 TextBgPixel(u8 bg, s16 x, s16 y, struct Rgb *color)
+     const u32 screenBase = VRAM + ((cnt >> 8) & 31) * 0x800;
+     const bool8 color256 = (cnt & 0x80) != 0;
+     const u8 size = (cnt >> 14) & 3;
+-    const u16 width = size & 1 ? 512 : 256;
+-    const u16 height = size & 2 ? 512 : 256;
++    const u16 widthMask = (size & 1 ? 512 : 256) - 1;
++    const u16 heightMask = (size & 2 ? 512 : 256) - 1;
+     const u32 hofsOffset = REG_OFFSET_BG0HOFS + bg * 4;
+     const u8 scanlineY = y < 0 ? 0 : y >= DISPLAY_HEIGHT ? DISPLAY_HEIGHT - 1 : y;
+     const u16 hofs = ScanlineGpuReg(hofsOffset, scanlineY) & 511;
+     const u16 vofs = ScanlineGpuReg(hofsOffset + 2, scanlineY) & 511;
+-    const u16 sx = (x + hofs) & (width - 1);
+-    const u16 sy = (y + vofs) & (height - 1);
++    const u16 sx = (x + hofs) & widthMask;
++    const u16 sy = (y + vofs) & heightMask;
+     const u8 block = (sx >= 256 ? 1 : 0) + (sy >= 256 ? (size == 3 ? 2 : 1) : 0);
+     const u8 mapX = (sx & 255) >> 3;
+     const u8 mapY = (sy & 255) >> 3;
+@@ -625,6 +625,86 @@ static bool8 TextBgPixel(u8 bg, s16 x, s16 y, struct Rgb *color)
+     return TRUE;
+ }
+ 
++static void SetWorldSource(u8 bg, u8 x, u8 y, bool8 mosaic);
++
++static void RenderTextBgScanlineFast(u8 bg, u8 y, u8 layer)
++{
++    const u16 cnt = ReadU16(REG_BASE + REG_OFFSET_BG0CNT + bg * 2);
++    const u32 charBase = VRAM + ((cnt >> 2) & 3) * 0x4000;
++    const u32 screenBase = VRAM + ((cnt >> 8) & 31) * 0x800;
++    const bool8 color256 = (cnt & 0x80) != 0;
++    const u8 size = (cnt >> 14) & 3;
++    const u16 widthMask = (size & 1 ? 512 : 256) - 1;
++    const u16 heightMask = (size & 2 ? 512 : 256) - 1;
++    const u32 hofsOffset = REG_OFFSET_BG0HOFS + bg * 4;
++    const u16 hofs = ScanlineGpuReg(hofsOffset, y) & 511;
++    const u16 vofs = ScanlineGpuReg(hofsOffset + 2, y) & 511;
++    const u16 sy = (y + vofs) & heightMask;
++    const u8 mapY = (sy & 255) >> 3;
++    const u8 subY = sy & 7;
++    const u8 blockY = sy >= 256 ? (size == 3 ? 2 : 1) : 0;
++    const u32 mapRowOffset = (u32)mapY * 64;
++    s16 scrollDx = 0;
++    u16 cachedTileKey = 0xffff;
++    u16 entry = 0;
++    u32 tileRowAddr = 0;
++    u32 paletteBase = 0;
++
++    if (sRecordingScreenEffects)
++    {
++        SetWorldSource(bg, 0, y, FALSE);
++        scrollDx = sCurrentWorldSourceX;
++    }
++
++    for (u32 x = 0; x < DISPLAY_WIDTH; x++)
++    {
++        const u16 sx = (x + hofs) & widthMask;
++        const u16 tileKey = sx >> 3;
++        u8 px;
++        u8 colorIndex;
++        struct Rgb color;
++
++        if (tileKey != cachedTileKey)
++        {
++            const u8 block = (sx >= 256 ? 1 : 0) + blockY;
++            const u8 mapX = (sx & 255) >> 3;
++            u8 py;
++
++            cachedTileKey = tileKey;
++            entry = ReadU16(screenBase + block * 0x800 + mapRowOffset + mapX * 2);
++            py = entry & 0x800 ? 7 - subY : subY;
++            if (color256)
++            {
++                tileRowAddr = charBase + (entry & 0x3ff) * 64 + py * 8;
++            }
++            else
++            {
++                tileRowAddr = charBase + (entry & 0x3ff) * 32 + py * 4;
++                paletteBase = PLTT + ((entry >> 12) & 15) * 32;
++            }
++        }
++        px = entry & 0x400 ? 7 - (sx & 7) : (sx & 7);
++        if (color256)
++        {
++            colorIndex = *Ptr8(tileRowAddr + px);
++            if (!colorIndex)
++                continue;
++            color = GbaColor(ReadU16(PLTT + colorIndex * 2));
++        }
++        else
++        {
++            const u8 packed = *Ptr8(tileRowAddr + (px >> 1));
++            colorIndex = px & 1 ? packed >> 4 : packed & 15;
++            if (!colorIndex)
++                continue;
++            color = GbaColor(ReadU16(paletteBase + colorIndex * 2));
++        }
++        if (sRecordingScreenEffects)
++            sCurrentWorldSourceX = (s16)x + scrollDx;
++        PutPixel(x, y, color, layer, FALSE);
++    }
++}
++
+ static bool8 AffineBgPixel(u8 bg, u8 x, u8 y, struct Rgb *color)
+ {
+     const u16 cnt = ReadU16(REG_BASE + REG_OFFSET_BG0CNT + bg * 2);
+@@ -758,6 +838,13 @@ static void RenderBgLayer(u8 bg, u8 type)
+     const u8 blockWidth = mosaic ? (REG_MOSAIC & 15) + 1 : 1;
+     const u8 blockHeight = mosaic ? ((REG_MOSAIC >> 4) & 15) + 1 : 1;
+ 
++    if (!type && blockWidth == 1 && blockHeight == 1)
++    {
++        for (u32 y = 0; y < DISPLAY_HEIGHT; y++)
++            RenderTextBgScanlineFast(bg, y, layer);
++        return;
++    }
++
+     for (u32 y = 0; y < DISPLAY_HEIGHT; y++)
+     {
+         const u8 sampleY = y - y % blockHeight;
+@@ -4874,6 +4961,7 @@ static void HdClassifyBuildingComponents(u32 sampleCols, u32 sampleRows,
+ 
+ static bool8 MapWorldPixel(s32 screenX, s32 screenY, const struct HdMapSample *sample,
+                            u16 attributes, u32 bottomPacked, u32 topPacked,
++                           struct Rgb backdropColor,
+                            struct Rgb *color, u8 *layer)
+ {
+     u8 layerType;
+@@ -4912,7 +5000,7 @@ static bool8 MapWorldPixel(s32 screenX, s32 screenY, const struct HdMapSample *s
+ 
+     if (screenX >= 0 && screenX < DISPLAY_WIDTH && screenY >= 0 && screenY < DISPLAY_HEIGHT)
+         mask = WindowMask(screenX, screenY);
+-    *color = GbaColor(ReadU16(BG_PLTT));
++    *color = backdropColor;
+     *layer = LAYER_BACKDROP;
+     bottomVisible = (mask & bottomLayer) && (bottomPacked >> 24) != 0;
+     topVisible = (mask & topLayer) && (topPacked >> 24) != 0;
+@@ -4942,7 +5030,7 @@ static bool8 MapWorldPixel(s32 screenX, s32 screenY, const struct HdMapSample *s
+     else if (bottomVisible)
+     {
+         const u8 scanlineY = screenY < 0 ? 0 : screenY >= DISPLAY_HEIGHT ? DISPLAY_HEIGHT - 1 : screenY;
+-        *color = DirectEffectColor(*color, *layer, GbaColor(ReadU16(BG_PLTT)), LAYER_BACKDROP,
++        *color = DirectEffectColor(*color, *layer, backdropColor, LAYER_BACKDROP,
+                                    mask & LAYER_BACKDROP, scanlineY);
+     }
+ 
+@@ -5206,6 +5294,9 @@ static void RenderHd2dWorld(u16 dispcnt)
+     const u8 bg1Priority = ReadU16(REG_BASE + REG_OFFSET_BG1CNT) & 3;
+     const u8 bg2Priority = ReadU16(REG_BASE + REG_OFFSET_BG2CNT) & 3;
+     const u8 bg3Priority = ReadU16(REG_BASE + REG_OFFSET_BG3CNT) & 3;
++    const struct Rgb backdropColor = GbaColor(ReadU16(BG_PLTT));
++    const u32 courseCols = sampleCols * 2;
++    const u32 courseRows = sampleRows * 2;
+ 
+     for (u32 y = 0; y < HD2D_WORLD_HEIGHT; y++)
+     {
+@@ -5219,6 +5310,15 @@ static void RenderHd2dWorld(u16 dispcnt)
+         const u32 *bottomCourse = NULL;
+         const u32 *topCourse = NULL;
+         u32 previousCourseX = 0xffffffff;
++        const struct HdMapSample *mapSample = NULL;
++        u16 mapAttributes = 0;
++        u8 topLayerForSample = LAYER_BG1;
++        s8 courseHeight = 0;
++        s8 courseGroundHeight = 0;
++        u16 courseGeometry = 0;
++        u8 courseReceiver = 0;
++        u16 courseFacade = 0;
++        bool8 isStructuralCourse = FALSE;
+ 
+         for (u32 x = 0; x < HD2D_WORLD_WIDTH; x++)
+         {
+@@ -5228,34 +5328,47 @@ static void RenderHd2dWorld(u16 dispcnt)
+             struct Rgb color;
+             u8 layer;
+             const u32 courseX = courseXs[x];
+-            const u32 courseIndex = courseY * sampleCols * 2 + courseX;
+-            const u32 sampleIndex = sampleY * sampleCols + sampleXs[x];
+-            const u8 quadrant = (courseY & 1) * 2 + (courseX & 1);
+-            const struct HdMapSample *mapSample = &sHdMapSamples[sampleIndex];
+             u32 bottomPacked;
+             u32 topPacked;
+ 
+             if (courseX != previousCourseX)
+             {
++                const u32 courseIndex = courseY * courseCols + courseX;
++                const u32 sampleIndex = sampleY * sampleCols + sampleXs[x];
++                const u8 quadrant = (courseY & 1) * 2 + (courseX & 1);
++                const s8 sampleTier = sHdSampleTiers[sampleIndex];
++                u8 surface;
++
++                mapSample = &sHdMapSamples[sampleIndex];
++                mapAttributes = sHdMapAttributes[sampleIndex];
++                topLayerForSample = UNPACK_LAYER_TYPE(mapAttributes) == METATILE_LAYER_TYPE_COVERED
++                    ? LAYER_BG2 : LAYER_BG1;
+                 bottomCourse = HdMetatileCourse(mapSample->layout, mapSample->metatileId, 0, quadrant);
+                 topCourse = HdMetatileCourse(mapSample->layout, mapSample->metatileId, 1, quadrant);
++                courseHeight = sHdCourseHeights[courseIndex] + sampleTier;
++                courseGroundHeight = sHdCourseGroundHeights[courseIndex] + sampleTier;
++                courseGeometry = sHdCourseGeometry[courseIndex];
++                courseReceiver = sHdCourseReceivers[courseIndex];
++                courseFacade = sHdCourseFacadeData[courseIndex];
++                surface = courseGeometry & HD2D_SURFACE_MASK;
++                isStructuralCourse = (surface == HD_SURFACE_WALL || surface == HD_SURFACE_ROOF);
+                 previousCourseX = courseX;
+             }
+             bottomPacked = bottomCourse[pixelY * HD2D_TILE_WIDTH + pixelXs[x]];
+             topPacked = topCourse[pixelY * HD2D_TILE_WIDTH + pixelXs[x]];
+             const bool8 mapVisible = MapWorldPixel(screenX, screenY,
+-                                                   mapSample, sHdMapAttributes[sampleIndex],
++                                                   mapSample, mapAttributes,
+                                                    bottomPacked, topPacked,
++                                                   backdropColor,
+                                                    &color, &layer);
+             sWasmWorldRgba[p] = color.r;
+             sWasmWorldRgba[p + 1] = color.g;
+             sWasmWorldRgba[p + 2] = color.b;
+             sWasmWorldRgba[p + 3] = mapVisible ? 255 : 0;
+-            sWasmWorldStructuralAlpha[pixel] = HdStructuralPixelVisible(
+-                courseX, courseY, sampleCols * 2, sampleRows * 2,
++            sWasmWorldStructuralAlpha[pixel] = (isStructuralCourse && HdStructuralPixelVisible(
++                courseX, courseY, courseCols, courseRows,
+                 pixelXs[x], pixelY, layer,
+-                layer == (UNPACK_LAYER_TYPE(sHdMapAttributes[sampleIndex]) == METATILE_LAYER_TYPE_COVERED
+-                    ? LAYER_BG2 : LAYER_BG1) ? topPacked : bottomPacked) ? 255 : 0;
++                layer == topLayerForSample ? topPacked : bottomPacked)) ? 255 : 0;
+             sWasmWorldLayerData[pixel] = layer;
+             if (layer == LAYER_BG1)
+                 sWasmBgPriorityData[pixel] = bg1Priority;
+@@ -5265,13 +5378,11 @@ static void RenderHd2dWorld(u16 dispcnt)
+                 sWasmBgPriorityData[pixel] = bg3Priority;
+             else
+                 sWasmBgPriorityData[pixel] = 4;
+-            sWasmWorldHeightData[pixel] = sHdCourseHeights[courseIndex]
+-                + sHdSampleTiers[sampleIndex];
+-            sWasmWorldGroundHeightData[pixel] = sHdCourseGroundHeights[courseIndex]
+-                + sHdSampleTiers[sampleIndex];
+-            sWasmWorldGeometryData[pixel] = sHdCourseGeometry[courseIndex];
+-            sWasmWorldReceiverData[pixel] = sHdCourseReceivers[courseIndex];
+-            sWasmWorldFacadeData[pixel] = sHdCourseFacadeData[courseIndex];
++            sWasmWorldHeightData[pixel] = courseHeight;
++            sWasmWorldGroundHeightData[pixel] = courseGroundHeight;
++            sWasmWorldGeometryData[pixel] = courseGeometry;
++            sWasmWorldReceiverData[pixel] = courseReceiver;
++            sWasmWorldFacadeData[pixel] = courseFacade;
+         }
+     }
+ }
+@@ -5562,6 +5673,16 @@ u32 WasmDisplayLayerBufferSize(void)
+     return sizeof(sLayerData);
+ }
+ 
++// Per-screen-layer priority straight from the live BG control registers. The
++// classic renderer does not fill the per-pixel priority buffer, so flat-field
++// compositing reads the four layer priorities instead.
++u32 WasmDisplayBgPriority(u32 layer)
++{
++    if (layer > 3)
++        return 4;
++    return (ReadU16(REG_BASE + REG_OFFSET_BG0CNT + layer * 2)) & 3;
++}
++
+ u8 *WasmDisplayObjectIdBuffer(void)
+ {
+     return sWasmObjectIdData;
+diff --git a/src/wild_encounter.c b/src/wild_encounter.c
+index 0656b19..732d6fc 100644
+--- a/src/wild_encounter.c
++++ b/src/wild_encounter.c
+@@ -16,10 +16,14 @@
+ #include "script.h"
+ #include "tv.h"
+ #include "wild_encounter.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "constants/abilities.h"
+ #include "constants/game_stat.h"
+ #include "constants/items.h"
+ #include "constants/layouts.h"
++#include "constants/pokedex.h"
+ #include "constants/weather.h"
+ 
+ extern const u8 EventScript_RepelWoreOff[];
+@@ -376,10 +380,29 @@ static u8 PickWildMonNature(void)
+     return Random() % NUM_NATURES;
+ }
+ 
+-static void CreateWildMon(u16 species, u8 level)
++static void NotifyRunWildEncounter(u16 species, u8 level, u32 slotKey)
++{
++#if WASM
++    u32 personality = GetMonData(&gEnemyParty[0], MON_DATA_PERSONALITY);
++    u32 sectionId = WasmRunMapSection();
++    WasmRunOnEncounter(sectionId, sectionId, species, level, personality & 0xffff, personality >> 16, slotKey);
++#else
++    (void)species;
++    (void)level;
++    (void)slotKey;
++#endif
++}
++
++static void CreateWildMon(u16 species, u8 level, u32 slotKey)
+ {
+     bool32 checkCuteCharm;
+ 
++#if WASM
++    species = WasmRunRandomSpecies(WASM_RUN_RANDOM_WILD, species, WasmRunMapSection(), slotKey);
++#else
++    (void)slotKey;
++#endif
++
+     ZeroEnemyPartyMons();
+     checkCuteCharm = TRUE;
+ 
+@@ -408,11 +431,23 @@ static void CreateWildMon(u16 species, u8 level)
+             gender = MON_FEMALE;
+ 
+         CreateMonWithGenderNatureLetter(&gEnemyParty[0], species, level, USE_RANDOM_IVS, gender, PickWildMonNature(), 0);
++        NotifyRunWildEncounter(species, level, slotKey);
+         return;
+     }
+ 
+     CreateMonWithNature(&gEnemyParty[0], species, level, USE_RANDOM_IVS, PickWildMonNature());
++    NotifyRunWildEncounter(species, level, slotKey);
+ }
++
++#if WASM
++u32 WasmRunTestCreateWildMon(u16 originalSpecies, u8 level, u32 slotKey)
++{
++    if (originalSpecies == SPECIES_NONE || originalSpecies > NATIONAL_DEX_COUNT || level == 0 || level > MAX_LEVEL)
++        return FALSE;
++    CreateWildMon(originalSpecies, level, slotKey);
++    return TRUE;
++}
++#endif
+ #ifdef BUGFIX
+ #define TRY_GET_ABILITY_INFLUENCED_WILD_MON_INDEX(wildPokemon, type, ability, ptr, count) TryGetAbilityInfluencedWildMonIndex(wildPokemon, type, ability, ptr, count)
+ #else
+@@ -451,7 +486,8 @@ static bool8 TryGenerateWildMon(const struct WildPokemonInfo *wildMonInfo, u8 ar
+     if (gMapHeader.mapLayoutId != LAYOUT_BATTLE_FRONTIER_BATTLE_PIKE_ROOM_WILD_MONS && flags & WILD_CHECK_KEEN_EYE && !IsAbilityAllowingEncounter(level))
+         return FALSE;
+ 
+-    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level);
++    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level,
++        ((u32)area << 16) | wildMonIndex);
+     return TRUE;
+ }
+ 
+@@ -460,8 +496,9 @@ static u16 GenerateFishingWildMon(const struct WildPokemonInfo *wildMonInfo, u8
+     u8 wildMonIndex = ChooseWildMonIndex_Fishing(rod);
+     u8 level = ChooseWildMonLevel(&wildMonInfo->wildPokemon[wildMonIndex]);
+ 
+-    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level);
+-    return wildMonInfo->wildPokemon[wildMonIndex].species;
++    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level,
++        ((u32)WILD_AREA_FISHING << 16) | ((u32)rod << 8) | wildMonIndex);
++    return GetMonData(&gEnemyParty[0], MON_DATA_SPECIES);
+ }
+ 
+ static bool8 SetUpMassOutbreakEncounter(u8 flags)
+@@ -471,7 +508,8 @@ static bool8 SetUpMassOutbreakEncounter(u8 flags)
+     if (flags & WILD_CHECK_REPEL && !IsWildLevelAllowedByRepel(gSaveBlock1Ptr->outbreakPokemonLevel))
+         return FALSE;
+ 
+-    CreateWildMon(gSaveBlock1Ptr->outbreakPokemonSpecies, gSaveBlock1Ptr->outbreakPokemonLevel);
++    CreateWildMon(gSaveBlock1Ptr->outbreakPokemonSpecies,
++        gSaveBlock1Ptr->outbreakPokemonLevel, 0x40000000);
+     for (i = 0; i < MAX_MON_MOVES; i++)
+         SetMonMoveSlot(&gEnemyParty[0], gSaveBlock1Ptr->outbreakPokemonMoves[i], i);
+ 
+@@ -785,8 +823,8 @@ void FishingWildEncounter(u8 rod)
+     {
+         u8 level = ChooseWildMonLevel(&sWildFeebas);
+ 
+-        species = sWildFeebas.species;
+-        CreateWildMon(species, level);
++        CreateWildMon(sWildFeebas.species, level, ((u32)WILD_AREA_FISHING << 16) | 0xFF);
++        species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES);
+     }
+     else
+     {
+diff --git a/tools/generate_wasm_assets.py b/tools/generate_wasm_assets.py
+index 0f3b0f0..ac60a54 100644
+--- a/tools/generate_wasm_assets.py
++++ b/tools/generate_wasm_assets.py
+@@ -15,13 +15,13 @@ def encoded_args(args):
+ 
+ 
+ def source_files():
+-    ignored = {'.git', 'build'}
+-    for path in pathlib.Path('.').rglob('*'):
+-        if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
++    for root in ('src', 'include', 'data', 'sound', 'constants', 'asm'):
++        root_path = pathlib.Path(root)
++        if not root_path.exists():
+             continue
+-        if ignored.intersection(path.parts):
+-            continue
+-        yield path
++        for path in root_path.rglob('*'):
++            if path.is_file() and path.suffix in SOURCE_SUFFIXES:
++                yield path
+ 
+ 
+ def run_gbagfx(input_path, output_path, options=()):
+diff --git a/tools/wasm_asm_data.py b/tools/wasm_asm_data.py
+index 5953b63..110af6c 100644
+--- a/tools/wasm_asm_data.py
++++ b/tools/wasm_asm_data.py
+@@ -301,7 +301,7 @@ def preprocess(source: Path) -> str:
+         capture_output=True,
+     )
+     cpp = subprocess.run(
+-        ["clang", "-E", "-x", "assembler-with-cpp", "-I", "include", "-"],
++        ["clang", "-E", "-x", "assembler-with-cpp", "-I", "include", "-I", "sound", "-"],
+         cwd=ROOT,
+         input=first.stdout,
+         check=True,
+@@ -316,7 +316,18 @@ def preprocess(source: Path) -> str:
+         text=True,
+         capture_output=True,
+     )
+-    return second.stdout
++    output = second.stdout
++    if source.name == "sound_data.s":
++        extra_chunks = [(ROOT / "sound/MPlayDef.s").read_text()]
++        for midi_s in sorted((ROOT / "sound/songs/midi").glob("*.s")):
++            lines = [
++                line
++                for line in midi_s.read_text().splitlines()
++                if line.strip() not in {'.include "MPlayDef.s"', ".end"}
++            ]
++            extra_chunks.append("\n".join(lines))
++        output = output + "\n" + "\n".join(extra_chunks) + "\n"
++    return output
+ 
+ 
+ def parse_int(expr: str, constants: Dict[str, int]) -> int:
+@@ -430,16 +441,20 @@ def load_event_macros(source: Optional[Path] = None) -> Dict[str, AsmMacro]:
+ 
+ def substitute_constants(line: str, constants: Dict[str, int]) -> str:
+     return re.sub(
+-        r"\b[A-Z][A-Za-z0-9_]*\b",
++        r"\b[A-Za-z_][A-Za-z0-9_]*\b",
+         lambda match: str(constants.get(match.group(0), match.group(0))),
+         line,
+     )
+ 
+ 
+ def substitute_expr_defines(line: str, defines: Dict[str, str]) -> str:
+-    for name, expr in sorted(defines.items(), key=lambda item: len(item[0]), reverse=True):
+-        line = re.sub(rf"\b{re.escape(name)}\b", expr, line)
+-    return line
++    if not defines:
++        return line
++    return re.sub(
++        r"\b[A-Za-z_][A-Za-z0-9_]*\b",
++        lambda match: defines.get(match.group(0), match.group(0)),
++        line,
++    )
+ 
+ 
+ def load_source_expr_defines(source: Optional[Path], constants: Dict[str, int]) -> Dict[str, str]:
+@@ -519,8 +534,11 @@ def format_asm_expr(expr: str, constants: Dict[str, int], expr_defines: Optional
+ 
+ 
+ def normalize_data_directive(line: str, constants: Dict[str, int], expr_defines: Optional[Dict[str, str]] = None) -> str:
++    line = line.replace("\t", " ").strip()
++    if line.startswith(".word "):
++        line = ".4byte " + line[len(".word "):].strip()
+     if line.startswith((".byte ", ".2byte ", ".4byte ")):
+-        directive, operands_text = line.split(" ", 1)
++        directive, operands_text = line.split(None, 1)
+         operands = split_args(operands_text)
+         return f"{directive} " + ", ".join(format_asm_expr(operand, constants, expr_defines) for operand in operands)
+     if line.startswith(".space "):
+@@ -578,9 +596,13 @@ def expand_event_macro(
+     out: List[str] = []
+     conditional_stack: List[Tuple[bool, bool]] = []
+     local_label_args: List[str] = []
+-    for body_line in macro.body:
++    body_lines = list(macro.body)
++    idx = 0
++    while idx < len(body_lines):
++        body_line = body_lines[idx]
++        idx += 1
+         stripped = body_line.strip()
+-        if stripped.startswith((".warning", ".error", ".set", ".purgem")):
++        if stripped.startswith((".warning", ".error", ".purgem")):
+             continue
+         if stripped.startswith(".ifb "):
+             value = values.get(stripped[len(".ifb "):].strip().lstrip("\\"), "")
+@@ -624,11 +646,71 @@ def expand_event_macro(
+         for param, value in sorted(values.items(), key=lambda item: len(item[0]), reverse=True):
+             expanded = expanded.replace(f"\\{param}", value)
+         expanded = re.sub(r"\\@", str(counters.setdefault("macro_local_id", 0)), expanded)
+-        expanded = substitute_expr_defines(expanded, expr_defines or {})
+ 
+-        if LABEL_RE.match(expanded):
+-            if local_label_args:
+-                local_label_args = []
++        if expanded.startswith(".rept "):
++            count_expr = substitute_expr_defines(expanded[len(".rept "):].strip(), expr_defines or {})
++            rept_count = eval_asm_expr(count_expr, constants) or 0
++            rept_depth = 1
++            endr_idx = idx
++            while endr_idx < len(body_lines):
++                cand = body_lines[endr_idx].strip()
++                if cand.startswith(".rept "):
++                    rept_depth += 1
++                elif cand == ".endr":
++                    rept_depth -= 1
++                    if rept_depth == 0:
++                        break
++                endr_idx += 1
++            rept_block = body_lines[idx:endr_idx]
++            body_lines[idx - 1 : endr_idx + 1] = rept_block * max(0, rept_count)
++            idx -= 1
++            continue
++
++        if expanded.startswith((".set ", ".equiv ", ".equ ")):
++            assign_part = re.split(r"\s+", expanded, maxsplit=1)[1]
++            sym_name, sym_expr = assign_part.split(",", 1)
++            sym_name = sym_name.strip()
++            sym_expr = sym_expr.strip()
++            rel_dot = re.match(r"^\.\s*-\s*(.+)$", sym_expr)
++            if rel_dot:
++                offset_val = eval_asm_expr(substitute_expr_defines(rel_dot.group(1), expr_defines or {}), constants) or 0
++                base_sym = f"__wasm_base_{sym_name}"
++                out.append(f"{base_sym}::")
++                if expr_defines is not None:
++                    expr_defines[sym_name] = f"{base_sym} - {offset_val}"
++            else:
++                val = eval_asm_expr(substitute_expr_defines(sym_expr, expr_defines or {}), constants)
++                if val is not None:
++                    constants[sym_name] = val
++                elif expr_defines is not None:
++                    expr_defines[sym_name] = substitute_constants(substitute_expr_defines(sym_expr, expr_defines), constants)
++            continue
++
++        if expanded.startswith((".global ", ".globl ")):
++            sym_name = re.split(r"\s+", expanded, maxsplit=1)[1].strip()
++            if counters is not None:
++                counters.setdefault("global_symbols", set()).add(sym_name)
++            continue
++
++        if expanded.startswith(".align "):
++            out.append(expanded)
++            continue
++
++        expanded = substitute_expr_defines(expanded, expr_defines or {})
++        if expanded.startswith(".word "):
++            expanded = ".4byte " + expanded[len(".word "):]
++
++        label_match = LABEL_RE.match(expanded)
++        if label_match:
++            if expanded.startswith("."):
++                if local_label_args:
++                    local_label_args = []
++                continue
++            lbl_name, lbl_colons, lbl_rest = label_match.groups()
++            is_glob = lbl_colons == "::" or (counters is not None and lbl_name in counters.get("global_symbols", set()))
++            out.append(f"{lbl_name}{'::' if is_glob else ':'}")
++            if lbl_rest:
++                out.append(lbl_rest)
+             continue
+ 
+         if re.search(r"\.L\w+_\d+_2\s*-\s*\.L\w+_\d+_1", expanded):
+@@ -1283,6 +1365,16 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+         open_label = None
+         open_label_sized = False
+ 
++    def open_symbol_label(name: str, is_global: bool):
++        nonlocal open_label, open_label_sized
++        close_label()
++        if is_global:
++            out.append(f".globl {name}")
++        out.append(f".type {name},@object")
++        out.append(f"{name}:")
++        open_label = name
++        open_label_sized = emit_sizes or is_global
++
+     skip_macro = 0
+     for raw in text.splitlines():
+         is_global_label = "; .global" in raw
+@@ -1290,7 +1382,7 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+         if not line:
+             continue
+ 
+-        stripped = line.strip()
++        stripped = line.replace("\t", " ").strip()
+         if stripped.startswith("#"):
+             continue
+         if stripped.startswith(".if "):
+@@ -1323,21 +1415,55 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+         if stripped.startswith(".macro "):
+             skip_macro = 1
+             continue
++        if stripped == "enum_start":
++            constants["__enum__"] = 0
++            continue
++        if stripped.startswith("enum_start "):
++            constants["__enum__"] = eval_asm_expr(stripped[len("enum_start "):], constants) or 0
++            continue
++        if stripped.startswith("enum "):
++            elem_name = stripped[len("enum "):].strip()
++            enum_val = constants.get("__enum__", 0)
++            constants[elem_name] = enum_val
++            constants["__enum__"] = enum_val + 1
++            continue
+         if (
+-            stripped.startswith("enum_start ")
+-            or stripped == "enum_start"
+-            or stripped.startswith("enum ")
+-            or stripped.startswith("create_movement_action ")
+-            or stripped in {"reset_map_events", "inc _num_npcs", "inc _num_warps", "inc _num_traps", "inc _num_signs"}
++            stripped.startswith("create_movement_action ")
++            or stripped in {"reset_map_events", "inc _num_npcs", "inc _num_warps", "inc _num_traps", "inc _num_signs", ".end"}
++            or stripped.startswith(".size ")
+         ):
+             continue
++        if stripped.startswith((".global ", ".globl ")):
++            sym_name = re.split(r"\s+", stripped, maxsplit=1)[1].strip()
++            counters.setdefault("global_symbols", set()).add(sym_name)
++            continue
++        if stripped.startswith(".incbin "):
++            out.append(stripped)
++            continue
++        if stripped == ".bss":
++            close_label()
++            out.append('.section .bss,"",@')
++            continue
+         assignment = ASSIGN_RE.match(stripped)
+-        if stripped.startswith(".equiv ") or stripped.startswith(".set "):
++        if stripped.startswith((".equiv ", ".set ", ".equ ")):
+             name, expr = re.split(r"\s+", stripped, maxsplit=1)[1].split(",", 1)
+-            try:
+-                constants[name.strip()] = eval(expr, {"__builtins__": {}}, constants)
+-            except Exception:
+-                pass
++            name = name.strip()
++            expr = expr.strip()
++            rel_dot = re.match(r"^\.\s*-\s*(.+)$", expr)
++            if rel_dot:
++                offset_val = eval_asm_expr(substitute_expr_defines(rel_dot.group(1), expr_defines), constants) or 0
++                base_sym = f"__wasm_base_{name}"
++                open_symbol_label(base_sym, True)
++                expr_defines[name] = f"{base_sym} - {offset_val}"
++                continue
++            eval_val = eval_asm_expr(substitute_expr_defines(expr, expr_defines), constants)
++            if eval_val is not None:
++                constants[name] = eval_val
++            else:
++                try:
++                    constants[name] = int(eval(expr, {"__builtins__": {}}, constants))
++                except Exception:
++                    expr_defines[name] = substitute_constants(substitute_expr_defines(expr, expr_defines), constants)
+             continue
+         if assignment:
+             name, expr = assignment.groups()
+@@ -1347,6 +1473,10 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+                 pass
+             continue
+ 
++        if stripped in constants:
++            out.append(f".byte {constants[stripped]}")
++            continue
++
+         if constants:
+             stripped = substitute_constants(stripped, constants)
+         if expr_defines:
+@@ -1354,7 +1484,16 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+ 
+         macro = expand_macro(stripped, constants, counters, macros, expr_defines)
+         if macro is not None:
+-            out.extend(normalize_data_directive(line, constants, expr_defines) for line in macro)
++            for m_line in macro:
++                m_match = LABEL_RE.match(m_line)
++                if m_match and not m_line.startswith("."):
++                    m_name, m_colons, m_rest = m_match.groups()
++                    m_glob = m_colons == "::" or m_name in counters.get("global_symbols", set())
++                    open_symbol_label(m_name, m_glob)
++                    if m_rest:
++                        out.append(normalize_data_directive(m_rest, constants, expr_defines))
++                    continue
++                out.append(normalize_data_directive(m_line, constants, expr_defines))
+             continue
+ 
+         if stripped.startswith(".section"):
+@@ -1368,18 +1507,13 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+         match = LABEL_RE.match(stripped)
+         if match:
+             name, colons, rest = match.groups()
+-            close_label()
+-            global_label = colons == "::" or is_global_label
+-            if global_label:
+-                out.append(f".globl {name}")
+-            out.append(f".type {name},@object")
+-            out.append(f"{name}:")
+-            open_label = name
+-            open_label_sized = emit_sizes or global_label
++            global_label = colons == "::" or is_global_label or name in counters.get("global_symbols", set())
++            open_symbol_label(name, global_label)
+             if rest:
+-                out.append(rest)
++                out.append(normalize_data_directive(rest, constants, expr_defines))
+             continue
+ 
++        stripped = normalize_data_directive(stripped, constants, expr_defines)
+         if stripped.startswith(".4byte "):
+             symbol = stripped[len(".4byte "):].strip()
+             if symbol in script_command_functions:
+@@ -1389,6 +1523,12 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
+         out.append(stripped)
+ 
+     close_label()
++    rel_dot_defines = {k: v for k, v in expr_defines.items() if "__wasm_base_" in v}
++    if rel_dot_defines:
++        out = [
++            substitute_expr_defines(line, rel_dot_defines) if line.startswith(".4byte ") else line
++            for line in out
++        ]
+     special_wrappers = counters.get("special_wrappers", [])
+     if special_wrappers:
+         emitted_wrappers = set()
