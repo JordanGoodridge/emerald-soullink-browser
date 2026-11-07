@@ -99,3 +99,39 @@ test('renderRunTrackerInto renders summary pills, route status badges, and grave
   assert.equal(graveyardChips.length, 1);
   assert.match(collectText(graveyardChips[0]), /Ash’s Pooch · fainted/);
 });
+
+test('renderRunTrackerInto prioritizes active/visited routes and collapses unvisited areas into details', () => {
+  const doc = createFakeDoc();
+  const container = doc.createElement('div');
+
+  const tracker = {
+    status: 'active',
+    summary: { visited: 2, linked: 0, pending: 0, void: 0, dead: 0 },
+    players: [{ playerId: 'p1', name: 'Jordan' }],
+    sections: [
+      { id: 0, label: 'LITTLEROOT TOWN', status: 'available', visited: true, areas: [] },
+      { id: 1, label: 'OLDALE TOWN', status: 'unvisited', visited: false, areas: [] },
+      { id: 2, label: 'DEWFORD TOWN', status: 'unvisited', visited: false, areas: [] },
+      { id: 16, label: 'ROUTE 101', status: 'available', visited: true, areas: [] },
+    ],
+    gifts: [],
+    graveyard: [],
+  };
+
+  renderRunTrackerInto(container, tracker, doc, {
+    currentArea: { label: 'ROUTE 101', status: 'encounter available' },
+  });
+
+  const lists = findAll(container, (el) => el.className === 'run-tracker-list');
+  // Primary list has active/visited routes with current area sorted first
+  const primaryRows = lists[0].children;
+  assert.equal(primaryRows.length, 2);
+  assert.match(collectText(primaryRows[0]), /ROUTE 101/);
+  assert.match(collectText(primaryRows[1]), /LITTLEROOT TOWN/);
+
+  // Unvisited areas are grouped into collapsible details
+  const unvisitedDetails = findAll(container, (el) => el.className === 'run-tracker-unvisited');
+  assert.equal(unvisitedDetails.length, 1);
+  const summaryEl = unvisitedDetails[0].children[0];
+  assert.equal(summaryEl.textContent, 'Unvisited areas (2)');
+});

@@ -152,3 +152,53 @@ test('buildPostRunSummary builds Hall of Fame victory roster and 8-badge timelin
   assert.equal(summary.champions[0].members[0].status, 'champion');
   assert.equal(summary.splits.every((s) => s.reached), true);
 });
+
+test('buildPostRunSummary excludes uncaught voided claims from totalCatches and deduplicates 3P award sprites', () => {
+  let state = createRunState({
+    runId: 'sl-3p-wipe',
+    seed: 365572647,
+    mode: 'soullink',
+    members: [
+      { playerId: 'p1', name: 'Jordan' },
+      { playerId: 'p2', name: 'jordy2shoes' },
+      { playerId: 'p3', name: 'Leontsu' },
+    ],
+    startedAt: 5000,
+  });
+
+  // 3 Starters caught
+  state = reduceRunEvent(state, { eventId: 's1', type: 'encounter.claim', playerId: 'p1', areaKey: 'emerald:gift:starter', species: 9, pid: 1, level: 5, isGift: true, at: 6000 }).state;
+  state = reduceRunEvent(state, { eventId: 's2', type: 'encounter.claim', playerId: 'p2', areaKey: 'emerald:gift:starter', species: 91, pid: 2, level: 5, isGift: true, at: 6100 }).state;
+  state = reduceRunEvent(state, { eventId: 's3', type: 'encounter.claim', playerId: 'p3', areaKey: 'emerald:gift:starter', species: 239, pid: 3, level: 5, isGift: true, at: 6200 }).state;
+  state = reduceRunEvent(state, { eventId: 'sr1', type: 'encounter.resolve', playerId: 'p1', areaKey: 'emerald:gift:starter', result: 'caught', at: 6300 }).state;
+  state = reduceRunEvent(state, { eventId: 'sr2', type: 'encounter.resolve', playerId: 'p2', areaKey: 'emerald:gift:starter', result: 'caught', at: 6400 }).state;
+  state = reduceRunEvent(state, { eventId: 'sr3', type: 'encounter.resolve', playerId: 'p3', areaKey: 'emerald:gift:starter', result: 'caught', at: 6500 }).state;
+
+  // Route 101 encounter claimed then KO'd (not caught)
+  state = reduceRunEvent(state, { eventId: 'w1', type: 'encounter.claim', playerId: 'p1', areaKey: 'emerald:section:16', sectionId: 16, species: 263, pid: 10, level: 3, at: 10_000 }).state;
+  state = reduceRunEvent(state, { eventId: 'wr1', type: 'encounter.resolve', playerId: 'p1', areaKey: 'emerald:section:16', sectionId: 16, result: 'lost', at: 12_000 }).state;
+
+  // p2 faints, dragging down p1 and p3
+  state = reduceRunEvent(state, { eventId: 'd1', type: 'death', playerId: 'p2', linkId: 'link:emerald:gift:starter', pid: 2, level: 5, at: 35_000 }).state;
+  state = reduceRunEvent(state, { eventId: 'wipe1', type: 'wipe.pending', playerId: 'p2', areaKey: 'emerald:section:16', sectionId: 16, at: 35_000 }).state;
+
+  const summary = buildPostRunSummary({
+    run: state,
+    localPlayerId: 'p1',
+    speciesInfoFor,
+  });
+
+  // Uncaught wild claim that became void must not be counted as caught
+  assert.equal(summary.metrics.encountersCaught, 3);
+  const catchStat = summary.stats.find((s) => s.id === 'catches');
+  assert.equal(catchStat.detail, '0 wild caught · 3 starters');
+
+  // MVP, Iron Link, and Heartbreaker awards feature distinct species sprites across the 3-player link
+  const mvpAward = summary.awards.find((a) => a.id === 'mvp');
+  const linkAward = summary.awards.find((a) => a.id === 'iron-link');
+  const heartbreakerAward = summary.awards.find((a) => a.id === 'heartbreaker');
+  assert.equal(mvpAward.species, 9);
+  assert.equal(linkAward.species, 91);
+  assert.equal(heartbreakerAward.species, 239);
+  assert.match(heartbreakerAward.headline, /Jordan.*&.*Leontsu/);
+});

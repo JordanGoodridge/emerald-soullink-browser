@@ -230,7 +230,12 @@ export function createGameplaySheetsController({
     const tracker = currentRunTracker();
     const summary = tracker.summary ?? {};
     if (runTrackerSummary) {
-      runTrackerSummary.textContent = `${summary.visited ?? 0} visited · ${summary.linked ?? 0} linked · ${summary.pending ?? 0} pending · ${summary.dead ?? 0} lost`;
+      const playerCount = tracker.players?.length ?? 0;
+      const modeLabel = playerCount > 1 ? `SoulLink · ${playerCount} players` : 'Nuzlocke run';
+      const totalAreas = summary.total ?? 0;
+      runTrackerSummary.textContent = totalAreas > 0
+        ? `${modeLabel} · ${summary.visited ?? 0} of ${totalAreas} areas visited`
+        : `${modeLabel} · ${summary.visited ?? 0} visited`;
     }
     const partyAdapter = getPartyAdapter();
     const runAdapter = getRunAdapter();

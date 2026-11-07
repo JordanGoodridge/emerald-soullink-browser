@@ -13,6 +13,29 @@ function createSpriteImg(doc, spriteUrl, alt, className = 'post-run-sprite') {
   return img;
 }
 
+function createCollapsiblePostRunSection(doc, titleText, className, { open = true, badgeText = null } = {}) {
+  const details = doc.createElement('details');
+  details.className = className;
+  if (open) {
+    details.open = true;
+    details.setAttribute?.('open', '');
+  }
+  const summary = doc.createElement('summary');
+  summary.className = 'post-run-section-summary';
+  const heading = doc.createElement('h3');
+  heading.className = 'post-run-section-title';
+  heading.textContent = titleText;
+  summary.append(heading);
+  if (badgeText !== null) {
+    const count = doc.createElement('span');
+    count.className = 'party-count-badge';
+    count.textContent = String(badgeText);
+    summary.append(count);
+  }
+  details.append(summary);
+  return details;
+}
+
 export function renderPostRunSummaryInto(container, summary, doc = globalThis.document) {
   if (!container || !doc) return;
   if (!summary || summary.status === 'unavailable') {
@@ -37,7 +60,7 @@ export function renderPostRunSummaryInto(container, summary, doc = globalThis.do
     nodes.push(rulesList);
   }
 
-  // 2. Core Stats Grid
+  // 2. Core Stats Grid (single 6-column row on desktop)
   if (Array.isArray(summary.stats) && summary.stats.length > 0) {
     const statsSection = doc.createElement('section');
     statsSection.className = 'post-run-section post-run-stats-section';
@@ -67,14 +90,14 @@ export function renderPostRunSummaryInto(container, summary, doc = globalThis.do
     nodes.push(statsSection);
   }
 
-  // 3. Superlatives & Run Awards
+  // 3. Superlatives & Run Awards (collapsible)
   if (Array.isArray(summary.awards) && summary.awards.length > 0) {
-    const awardsSection = doc.createElement('section');
-    awardsSection.className = 'post-run-section post-run-awards-section';
-    const heading = doc.createElement('h3');
-    heading.className = 'post-run-section-title';
-    heading.textContent = summary.outcome === 'victory' ? 'Hall of Fame Honors & Superlatives' : 'Run Superlatives & Honors';
-    awardsSection.append(heading);
+    const awardsSection = createCollapsiblePostRunSection(
+      doc,
+      summary.outcome === 'victory' ? 'Hall of Fame Honors & Superlatives' : 'Run Superlatives & Honors',
+      'post-run-section post-run-awards-section',
+      { open: true, badgeText: summary.awards.length },
+    );
 
     const awardsGrid = doc.createElement('div');
     awardsGrid.className = 'post-run-awards-grid';
@@ -109,15 +132,16 @@ export function renderPostRunSummaryInto(container, summary, doc = globalThis.do
     nodes.push(awardsSection);
   }
 
-  // 4. Hall of Fame Champions / Final Party Roster
+  // 4. Hall of Fame Champions / Final Party Roster (collapsible)
   const populatedRosters = (summary.champions ?? []).filter((r) => (r.members?.length ?? 0) > 0);
   if (populatedRosters.length > 0) {
-    const rosterSection = doc.createElement('section');
-    rosterSection.className = 'post-run-section post-run-roster-section';
-    const heading = doc.createElement('h3');
-    heading.className = 'post-run-section-title';
-    heading.textContent = summary.outcome === 'victory' ? 'Inducted Champion Lineup' : 'Final Party & Survivors';
-    rosterSection.append(heading);
+    const totalRosterMons = populatedRosters.reduce((sum, r) => sum + (r.members?.length ?? 0), 0);
+    const rosterSection = createCollapsiblePostRunSection(
+      doc,
+      summary.outcome === 'victory' ? 'Inducted Champion Lineup' : 'Final Party & Survivors',
+      'post-run-section post-run-roster-section',
+      { open: summary.outcome === 'victory', badgeText: totalRosterMons },
+    );
 
     for (const playerRoster of populatedRosters) {
       const group = doc.createElement('div');
@@ -171,16 +195,16 @@ export function renderPostRunSummaryInto(container, summary, doc = globalThis.do
     nodes.push(rosterSection);
   }
 
-  // 5. The Fallen (Graveyard Epitaphs)
+  // 5. The Fallen (Graveyard Epitaphs — collapsible)
   const graveyard = Array.isArray(summary.graveyard) ? summary.graveyard : [];
-  const graveyardSection = doc.createElement('section');
-  graveyardSection.className = 'post-run-section post-run-graveyard-section';
-  const graveyardHeading = doc.createElement('h3');
-  graveyardHeading.className = 'post-run-section-title';
-  graveyardHeading.textContent = summary.outcome === 'victory'
-    ? `Honored Fallen (${graveyard.length})`
-    : `Run Morgue · Fallen Pokémon (${graveyard.length})`;
-  graveyardSection.append(graveyardHeading);
+  const graveyardSection = createCollapsiblePostRunSection(
+    doc,
+    summary.outcome === 'victory'
+      ? `Honored Fallen (${graveyard.length})`
+      : `Run Morgue · Fallen Pokémon (${graveyard.length})`,
+    'post-run-section post-run-graveyard-section',
+    { open: graveyard.length > 0, badgeText: graveyard.length },
+  );
 
   if (graveyard.length === 0) {
     const empty = doc.createElement('p');

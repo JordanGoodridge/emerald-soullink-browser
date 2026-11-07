@@ -451,9 +451,21 @@
 }
 
 .group-wipe-actions {
+  position: sticky;
+  bottom: calc(-1 * clamp(16px, 4vw, 26px));
+  z-index: 3;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
+  margin-inline: calc(-1 * clamp(16px, 4vw, 26px));
+  margin-bottom: calc(-1 * clamp(16px, 4vw, 26px));
+  padding: 12px clamp(16px, 4vw, 26px);
+  border-top: 2px solid var(--frame-navy);
+  background: var(--lib-bg);
+}
+
+#group-wipe-dialog[data-outcome="victory"] .group-wipe-actions {
+  background: #fffdf1;
 }
 
 .group-wipe-actions button {

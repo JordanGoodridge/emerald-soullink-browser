@@ -74,7 +74,8 @@
 /* Save picker and party sheet use the same framed system as Settings. */
 
 #save-profile-dialog.themed-dialog,
-#party-panel.themed-dialog {
+#party-panel.themed-dialog,
+#run-tracker-dialog.themed-dialog {
   position: fixed;
   inset: 0;
   width: min(620px, calc(100vw - 24px));
@@ -99,13 +100,19 @@
   width: min(860px, calc(100vw - 24px));
 }
 
+#run-tracker-dialog.themed-dialog {
+  width: min(680px, calc(100vw - 24px));
+}
+
 #save-profile-dialog.themed-dialog::backdrop,
-#party-panel.themed-dialog::backdrop {
+#party-panel.themed-dialog::backdrop,
+#run-tracker-dialog.themed-dialog::backdrop {
   background: rgb(21 37 64 / 40%);
 }
 
 #save-profile-dialog > .save-profile-form,
-#party-panel > .party-panel-form {
+#party-panel > .party-panel-form,
+#run-tracker-dialog > .run-tracker-form {
   position: relative;
   z-index: 2;
   max-height: min(calc(88dvh - 14px), 766px);
@@ -116,27 +123,31 @@
 }
 
 #save-profile-dialog .presence-head,
-#party-panel .presence-head {
+#party-panel .presence-head,
+#run-tracker-dialog .presence-head {
   align-items: center;
   padding: 0 0 10px;
   border-bottom: 1px solid #c6cbbf;
 }
 
 #save-profile-dialog .presence-head h2,
-#party-panel .presence-head h2 {
+#party-panel .presence-head h2,
+#run-tracker-dialog .presence-head h2 {
   color: var(--frame-navy);
   font-size: 26px;
   line-height: 1.15;
 }
 
 #save-profile-dialog .presence-status,
-#party-panel .presence-status {
+#party-panel .presence-status,
+#run-tracker-dialog .presence-status {
   color: #70798a;
   font-size: 16px;
 }
 
 #save-profile-dialog .presence-head button,
-#party-panel .presence-head button {
+#party-panel .presence-head button,
+#run-tracker-dialog .presence-head button {
   min-height: 38px;
   padding: 4px 12px;
   border: 2px solid var(--frame-navy);
@@ -150,12 +161,15 @@
 #save-profile-dialog .presence-head button:hover,
 #save-profile-dialog .presence-head button:focus-visible,
 #party-panel .presence-head button:hover,
-#party-panel .presence-head button:focus-visible {
+#party-panel .presence-head button:focus-visible,
+#run-tracker-dialog .presence-head button:hover,
+#run-tracker-dialog .presence-head button:focus-visible {
   background: var(--lib-mint);
 }
 
 #save-profile-dialog .presence-note,
 #party-panel .presence-note,
+#run-tracker-dialog .presence-note,
 #save-profile-dialog .presence-hint {
   color: #5d6a80;
   font-size: 16px;
@@ -301,9 +315,37 @@
 
 #party-panel .party-players-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
   gap: 12px;
   align-items: start;
+}
+
+#party-panel .party-players-grid[data-player-count="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  #party-panel .party-players-grid,
+  #party-panel .party-players-grid[data-player-count="4"] {
+    grid-template-columns: 1fr;
+  }
+}
+
+#party-panel .party-collapsible-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+#party-panel .party-links > .party-link-list {
+  margin-top: 8px;
+}
+
+#party-panel .party-graveyard > .party-graveyard-list {
+  margin-top: 6px;
 }
 
 #party-panel .party-player {
@@ -649,17 +691,62 @@
   font-size: 13px;
 }
 
+#run-tracker-dialog #run-tracker-body {
+  display: grid;
+  gap: 14px;
+}
+
+#run-tracker-dialog .party-stat-pill[data-filter] {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+
+#run-tracker-dialog .party-stat-pill[data-filter]:hover {
+  border-color: var(--frame-navy);
+}
+
+#run-tracker-dialog .party-stat-pill[data-active="true"] {
+  border-color: var(--frame-navy);
+  box-shadow: 0 2px 0 var(--frame-navy);
+  font-weight: 700;
+}
+
+#run-tracker-dialog .run-tracker-section-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+#run-tracker-dialog .run-tracker-section-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#run-tracker-dialog .run-tracker-section > .run-tracker-list,
+#run-tracker-dialog .run-tracker-section > .party-graveyard-list {
+  margin-top: 8px;
+}
+
 #run-tracker-dialog .run-tracker-row-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
 }
 
 #run-tracker-dialog .run-tracker-claims {
+  flex: 1 1 auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 #run-tracker-dialog .run-claim-chip {
@@ -670,11 +757,35 @@
   font-size: 12px;
 }
 
+#run-tracker-dialog .run-tracker-unvisited {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+#run-tracker-dialog .run-tracker-unvisited-summary {
+  cursor: pointer;
+  color: #586879;
+  font-size: 14px;
+  font-weight: 700;
+  user-select: none;
+}
+
+#run-tracker-dialog .run-tracker-unvisited-summary:hover,
+#run-tracker-dialog .run-tracker-unvisited-summary:focus-visible {
+  color: var(--frame-navy);
+}
+
 /* Post-Run Hall of Fame & Morgue Summary Sheet */
 #group-wipe-dialog.group-wipe-dialog {
   width: min(860px, calc(100vw - 24px));
-  max-height: min(88dvh, 840px);
-  overflow: auto;
+  max-height: min(90dvh, 840px);
+  overflow: hidden;
+}
+
+#group-wipe-dialog.group-wipe-dialog > .group-wipe-screen {
+  max-height: min(90dvh, 840px);
+  overflow-y: auto;
 }
 
 #group-wipe-dialog[data-outcome="victory"] .group-wipe-screen {
@@ -693,30 +804,45 @@
 
 .post-run-summary-body {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .post-run-rules {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .post-run-rule-pill {
-  padding: 3px 8px;
+  padding: 2px 7px;
   border: 1px solid #c6cbbf;
   background: #f5f4e4;
   color: var(--frame-navy);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .post-run-section {
   display: grid;
   gap: 8px;
+}
+
+.post-run-section-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #c6cbbf;
+  cursor: pointer;
+  user-select: none;
+}
+
+.post-run-section > :not(summary) {
+  margin-top: 8px;
 }
 
 .post-run-section-title {
@@ -727,32 +853,44 @@
 
 .post-run-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 780px) {
+  .post-run-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .post-run-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .post-run-stat-card {
   display: grid;
   gap: 2px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 2px solid var(--frame-navy);
   background: #f5f4e4;
   color: var(--frame-navy);
 }
 
 .post-run-stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--lib-muted);
   text-transform: uppercase;
 }
 
 .post-run-stat-value {
-  font-size: 20px;
+  font-size: 18px;
   color: var(--frame-navy);
 }
 
 .post-run-stat-detail {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--lib-muted);
 }
 

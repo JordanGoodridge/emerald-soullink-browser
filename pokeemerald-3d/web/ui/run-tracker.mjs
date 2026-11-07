@@ -9,25 +9,99 @@ const SECTION_STATUS_LABEL = Object.freeze({
   dead: 'Fallen',
 });
 
-function section(doc, title, className) {
-  const node = doc.createElement('section');
+const SECTION_STATUS_PRIORITY = Object.freeze({
+  pending: 0,
+  linked: 1,
+  claimed: 2,
+  available: 3,
+  open: 3,
+  dead: 4,
+  void: 5,
+  unvisited: 6,
+});
+
+function collapsibleSection(doc, title, className, { open = true, badgeText = null, extraHeaderNode = null } = {}) {
+  const node = doc.createElement('details');
   node.className = className;
+  if (open) {
+    node.open = true;
+    node.setAttribute?.('open', '');
+  }
+  const summary = doc.createElement('summary');
+  summary.className = 'run-tracker-section-summary';
   const heading = doc.createElement('h3');
   heading.textContent = title;
-  node.append(heading);
+  summary.append(heading);
+
+  if (extraHeaderNode || badgeText !== null) {
+    const meta = doc.createElement('div');
+    meta.className = 'run-tracker-section-meta';
+    if (extraHeaderNode) meta.append(extraHeaderNode);
+    if (badgeText !== null) {
+      const count = doc.createElement('span');
+      count.className = 'party-count-badge';
+      count.textContent = String(badgeText);
+      meta.append(count);
+    }
+    summary.append(meta);
+  }
+
+  node.append(summary);
   return node;
 }
 
-function createSummaryPill(doc, value, label, tone = 'default') {
+function createSummaryPill(doc, value, label, tone = 'default', filterKey = null) {
   const pill = doc.createElement('span');
   pill.className = 'party-stat-pill';
   pill.dataset.tone = tone;
+  if (filterKey) {
+    pill.dataset.filter = filterKey;
+  }
   const num = doc.createElement('strong');
   num.textContent = String(value);
   const text = doc.createElement('span');
   text.textContent = label;
   pill.append(num, text);
   return pill;
+}
+
+function renderSectionRow(doc, entry, speciesNameFor) {
+  const item = doc.createElement('li');
+  item.dataset.status = entry.status;
+  item.dataset.visited = entry.visited ? 'true' : 'false';
+
+  const rowHead = doc.createElement('div');
+  rowHead.className = 'run-tracker-row-head';
+
+  const title = doc.createElement('strong');
+  title.textContent = entry.label;
+  rowHead.append(title);
+
+  const claimsWrap = doc.createElement('div');
+  claimsWrap.className = 'run-tracker-claims';
+  for (const area of entry.areas ?? []) {
+    for (const member of area.members ?? []) {
+      if (!member.species) continue;
+      const mon = doc.createElement('small');
+      mon.className = 'run-claim-chip';
+      mon.dataset.status = member.status ?? 'alive';
+      const monLabel = member.nickname || speciesNameFor(member.species) || `#${member.species}`;
+      mon.textContent = `${member.name}: ${monLabel}`;
+      claimsWrap.append(mon);
+    }
+  }
+  if (claimsWrap.children?.length) {
+    rowHead.append(claimsWrap);
+  }
+
+  const state = doc.createElement('span');
+  state.className = 'run-status-badge';
+  state.dataset.status = entry.status;
+  state.textContent = SECTION_STATUS_LABEL[entry.status] ?? entry.status;
+
+  rowHead.append(state);
+  item.append(rowHead);
+  return item;
 }
 
 export function renderRunTrackerInto(
@@ -51,67 +125,103 @@ export function renderRunTrackerInto(
 
   const summaryBar = doc.createElement('div');
   summaryBar.className = 'party-stat-pills run-tracker-pills';
-  summaryBar.append(
-    createSummaryPill(doc, counts.visited ?? 0, 'Visited', 'default'),
-    createSummaryPill(doc, counts.linked ?? 0, 'Linked', 'mint'),
-    createSummaryPill(doc, counts.pending ?? 0, 'Pending', counts.pending ? 'gold' : 'default'),
-    createSummaryPill(doc, counts.void ?? 0, 'Missed', counts.void ? 'muted' : 'default'),
-    createSummaryPill(doc, graveyard.length || (counts.dead ?? 0), 'Fallen', (graveyard.length || counts.dead) ? 'danger' : 'default'),
-  );
+  const pills = [
+    createSummaryPill(doc, counts.visited ?? 0, 'Visited', 'default', 'visited'),
+    createSummaryPill(doc, counts.linked ?? 0, 'Linked', 'mint', 'linked'),
+    createSummaryPill(doc, counts.pending ?? 0, 'Pending', counts.pending ? 'gold' : 'default', 'pending'),
+    createSummaryPill(doc, counts.void ?? 0, 'Missed', counts.void ? 'muted' : 'default', 'void'),
+    createSummaryPill(doc, graveyard.length || (counts.dead ?? 0), 'Fallen', (graveyard.length || counts.dead) ? 'danger' : 'default', 'dead'),
+  ];
+  summaryBar.append(...pills);
   out.push(summaryBar);
 
-  const areas = section(doc, 'Routes & areas', 'run-tracker-section');
+  let currentBadge = null;
   if (currentArea) {
-    const current = doc.createElement('p');
-    current.className = 'run-tracker-current';
-    current.textContent = `Current area: ${currentArea.label} · ${currentArea.status}`;
-    areas.append(current);
+    currentBadge = doc.createElement('span');
+    currentBadge.className = 'run-tracker-current';
+    currentBadge.textContent = `📍 ${currentArea.label} · ${currentArea.status}`;
   }
+
+  const allSections = tracker.sections ?? [];
+  const currentLabelUpper = currentArea?.label ? String(currentArea.label).toUpperCase() : null;
+  const activeSections = [];
+  const unvisitedSections = [];
+  for (const entry of allSections) {
+    const isCurrent = currentLabelUpper && String(entry.label ?? '').toUpperCase() === currentLabelUpper;
+    if (entry.status !== 'unvisited' || entry.visited || isCurrent) {
+      activeSections.push(entry);
+    } else {
+      unvisitedSections.push(entry);
+    }
+  }
+
+  activeSections.sort((a, b) => {
+    const aCurrent = currentLabelUpper && String(a.label ?? '').toUpperCase() === currentLabelUpper ? 0 : 1;
+    const bCurrent = currentLabelUpper && String(b.label ?? '').toUpperCase() === currentLabelUpper ? 0 : 1;
+    if (aCurrent !== bCurrent) return aCurrent - bCurrent;
+    const aPrio = SECTION_STATUS_PRIORITY[a.status] ?? 9;
+    const bPrio = SECTION_STATUS_PRIORITY[b.status] ?? 9;
+    return aPrio - bPrio;
+  });
+
+  const areas = collapsibleSection(doc, 'Routes & areas', 'run-tracker-section', {
+    open: true,
+    badgeText: `${activeSections.length} active`,
+    extraHeaderNode: currentBadge,
+  });
+
   const list = doc.createElement('ul');
   list.className = 'run-tracker-list';
-  for (const entry of tracker.sections ?? []) {
-    const item = doc.createElement('li');
-    item.dataset.status = entry.status;
-
-    const rowHead = doc.createElement('div');
-    rowHead.className = 'run-tracker-row-head';
-
-    const title = doc.createElement('strong');
-    title.textContent = entry.label;
-
-    const state = doc.createElement('span');
-    state.className = 'run-status-badge';
-    state.dataset.status = entry.status;
-    state.textContent = SECTION_STATUS_LABEL[entry.status] ?? entry.status;
-
-    rowHead.append(title, state);
-    item.append(rowHead);
-
-    const claimsWrap = doc.createElement('div');
-    claimsWrap.className = 'run-tracker-claims';
-    for (const area of entry.areas ?? []) {
-      for (const member of area.members ?? []) {
-        if (!member.species) continue;
-        const mon = doc.createElement('small');
-        mon.className = 'run-claim-chip';
-        mon.dataset.status = member.status ?? 'alive';
-        const monLabel = member.nickname || speciesNameFor(member.species) || `#${member.species}`;
-        mon.textContent = `${member.name}: ${monLabel}`;
-        claimsWrap.append(mon);
-      }
-    }
-    if (claimsWrap.children?.length) {
-      item.append(claimsWrap);
-    }
-    list.append(item);
+  const primaryEntries = activeSections.length > 0 ? activeSections : unvisitedSections;
+  const renderedRows = [];
+  for (const entry of primaryEntries) {
+    const row = renderSectionRow(doc, entry, speciesNameFor);
+    renderedRows.push(row);
+    list.append(row);
   }
   areas.append(list);
+
+  // Wire interactive filter pills when running in a live DOM
+  let activeFilter = null;
+  for (const pill of pills) {
+    pill.addEventListener?.('click', () => {
+      const key = pill.dataset.filter;
+      activeFilter = activeFilter === key ? null : key;
+      for (const p of pills) {
+        p.dataset.active = activeFilter === p.dataset.filter ? 'true' : 'false';
+      }
+      for (const row of renderedRows) {
+        const matches = !activeFilter
+          || (activeFilter === 'visited' ? row.dataset.visited === 'true' || row.dataset.status !== 'unvisited' : row.dataset.status === activeFilter);
+        row.hidden = !matches;
+      }
+    });
+  }
+
+  if (activeSections.length > 0 && unvisitedSections.length > 0) {
+    const unvisitedDetails = doc.createElement('details');
+    unvisitedDetails.className = 'run-tracker-unvisited';
+    const unvisitedSummary = doc.createElement('summary');
+    unvisitedSummary.className = 'run-tracker-unvisited-summary';
+    unvisitedSummary.textContent = `Unvisited areas (${unvisitedSections.length})`;
+    const unvisitedList = doc.createElement('ul');
+    unvisitedList.className = 'run-tracker-list';
+    for (const entry of unvisitedSections) {
+      unvisitedList.append(renderSectionRow(doc, entry, speciesNameFor));
+    }
+    unvisitedDetails.append(unvisitedSummary, unvisitedList);
+    areas.append(unvisitedDetails);
+  }
   out.push(areas);
 
-  const giftsSection = section(doc, 'Gifts & special encounters', 'run-tracker-section run-tracker-gifts');
+  const giftItems = tracker.gifts ?? [];
+  const giftsSection = collapsibleSection(doc, 'Gifts & special encounters', 'run-tracker-section run-tracker-gifts', {
+    open: giftItems.length > 0,
+    badgeText: giftItems.length,
+  });
   const gifts = doc.createElement('ul');
   gifts.className = 'run-tracker-list';
-  for (const gift of tracker.gifts ?? []) {
+  for (const gift of giftItems) {
     const item = doc.createElement('li');
     item.dataset.status = gift.status;
 
@@ -120,14 +230,7 @@ export function renderRunTrackerInto(
 
     const title = doc.createElement('strong');
     title.textContent = gift.label;
-
-    const detail = doc.createElement('span');
-    detail.className = 'run-status-badge';
-    detail.dataset.status = gift.status;
-    detail.textContent = SECTION_STATUS_LABEL[gift.status] ?? gift.status;
-
-    rowHead.append(title, detail);
-    item.append(rowHead);
+    rowHead.append(title);
 
     const claimsWrap = doc.createElement('div');
     claimsWrap.className = 'run-tracker-claims';
@@ -140,8 +243,16 @@ export function renderRunTrackerInto(
       claimsWrap.append(chip);
     }
     if (claimsWrap.children?.length) {
-      item.append(claimsWrap);
+      rowHead.append(claimsWrap);
     }
+
+    const detail = doc.createElement('span');
+    detail.className = 'run-status-badge';
+    detail.dataset.status = gift.status;
+    detail.textContent = SECTION_STATUS_LABEL[gift.status] ?? gift.status;
+
+    rowHead.append(detail);
+    item.append(rowHead);
     gifts.append(item);
   }
   if (!gifts.children.length) {
@@ -154,7 +265,9 @@ export function renderRunTrackerInto(
   out.push(giftsSection);
 
   if (graveyard.length) {
-    const graveyardSection = section(doc, `Graveyard (${graveyard.length})`, 'run-tracker-section party-graveyard');
+    const graveyardSection = collapsibleSection(doc, `Graveyard (${graveyard.length})`, 'run-tracker-section party-graveyard', {
+      open: true,
+    });
     const graveList = doc.createElement('ul');
     graveList.className = 'party-graveyard-list';
     for (const death of graveyard.slice(-24).reverse()) {

@@ -185,11 +185,13 @@ function renderPlayerCard(doc, player, { moveRelearnerEnabled, onOpenMoveRelearn
 }
 
 function renderLinksSection(doc, links) {
-  const linksSection = doc.createElement('section');
+  const linksSection = doc.createElement('details');
   linksSection.className = 'party-links';
+  linksSection.open = true;
+  linksSection.setAttribute?.('open', '');
 
-  const head = doc.createElement('header');
-  head.className = 'party-section-head';
+  const head = doc.createElement('summary');
+  head.className = 'party-section-head party-collapsible-summary';
   const h = doc.createElement('h3');
   h.textContent = 'SoulLink bonds';
   const count = doc.createElement('span');
@@ -213,13 +215,6 @@ function renderLinksSection(doc, links) {
     const origin = doc.createElement('span');
     origin.className = 'party-link-origin';
     origin.textContent = link.areaLabel || 'SoulLink bond';
-
-    const badge = doc.createElement('span');
-    badge.className = 'party-link-badge';
-    badge.dataset.placement = placement;
-    badge.textContent = LINK_PLACEMENT_LABEL[placement] ?? 'Linked';
-
-    rowHead.append(origin, badge);
 
     const pairsRow = doc.createElement('div');
     pairsRow.className = 'party-link-pairs';
@@ -254,7 +249,13 @@ function renderLinksSection(doc, links) {
       pairsRow.append(chip);
     }
 
-    item.append(rowHead, pairsRow);
+    const badge = doc.createElement('span');
+    badge.className = 'party-link-badge';
+    badge.dataset.placement = placement;
+    badge.textContent = LINK_PLACEMENT_LABEL[placement] ?? 'Linked';
+
+    rowHead.append(origin, pairsRow, badge);
+    item.append(rowHead);
     list.append(item);
   }
   linksSection.append(list);
@@ -282,17 +283,6 @@ function renderRunSummarySection(doc, tracker, links, { onOpenRunTracker }) {
   titleWrap.append(heading, statusPill);
   head.append(titleWrap);
 
-  if (typeof onOpenRunTracker === 'function') {
-    const openBtn = doc.createElement('button');
-    openBtn.type = 'button';
-    openBtn.className = 'party-open-tracker';
-    openBtn.textContent = 'Open Run Tracker ›';
-    openBtn.addEventListener('click', () => onOpenRunTracker());
-    head.append(openBtn);
-  }
-
-  runSection.append(head);
-
   const counts = tracker.summary ?? {};
   const graveyard = tracker.graveyard ?? [];
   const pillsBar = doc.createElement('div');
@@ -306,14 +296,30 @@ function renderRunSummarySection(doc, tracker, links, { onOpenRunTracker }) {
   if (counts.void) {
     pillsBar.append(createStatPill(doc, counts.void, 'Missed', 'muted'));
   }
-  runSection.append(pillsBar);
+  head.append(pillsBar);
+
+  if (typeof onOpenRunTracker === 'function') {
+    const openBtn = doc.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'party-open-tracker';
+    openBtn.textContent = 'Open Run Tracker ›';
+    openBtn.addEventListener('click', () => onOpenRunTracker());
+    head.append(openBtn);
+  }
+
+  runSection.append(head);
 
   if (graveyard.length) {
-    const graveyardSection = doc.createElement('section');
+    const graveyardSection = doc.createElement('details');
     graveyardSection.className = 'party-graveyard';
+    graveyardSection.open = true;
+    graveyardSection.setAttribute?.('open', '');
+    const graveyardSummary = doc.createElement('summary');
+    graveyardSummary.className = 'party-collapsible-summary';
     const graveyardHeading = doc.createElement('h4');
     graveyardHeading.textContent = `Graveyard (${graveyard.length})`;
-    graveyardSection.append(graveyardHeading);
+    graveyardSummary.append(graveyardHeading);
+    graveyardSection.append(graveyardSummary);
 
     const list = doc.createElement('ul');
     list.className = 'party-graveyard-list';

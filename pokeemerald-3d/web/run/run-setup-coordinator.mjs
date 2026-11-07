@@ -213,7 +213,9 @@ export function createRunSetupCoordinator({
       }
       groupWipeReason.textContent = victoryPending
         ? summary.subtitle
-        : 'No living Pokémon remain in the active party. Pokémon in the PC do not prevent a wipe.';
+        : (summary.wipeDetail?.reason
+            ? `${summary.wipeDetail.reason} Pokémon in the PC do not prevent a wipe.`
+            : 'No living Pokémon remain in the active party. Pokémon in the PC do not prevent a wipe.');
       runReadyButton.hidden = !activeMembers.some((member) => member.playerId === room.playerId);
       const self = activeMembers.find((member) => member.playerId === room.playerId);
       runReadyButton.disabled = !self || self.ready === true || !runClient?.attached;

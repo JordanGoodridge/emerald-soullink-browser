@@ -150,6 +150,12 @@ export function buildPostRunSummary({
   const durationLabel = formatRunDuration(durationMs);
 
   // Origin lookup by playerId + pid (or species fallback)
+  const caughtResolutionKeys = new Set();
+  for (const ev of events) {
+    if (ev?.type === 'encounter.resolve' && ev?.result === 'caught' && ev.playerId && ev.areaKey) {
+      caughtResolutionKeys.add(`${ev.areaKey}:${ev.playerId}`);
+    }
+  }
   const claimOriginByPid = new Map();
   const claimOriginBySpecies = new Map();
   const allCaughtClaims = [];
@@ -172,7 +178,9 @@ export function buildPostRunSummary({
       if (!claimOriginBySpecies.has(`${claim.playerId}:${claim.species}`)) {
         claimOriginBySpecies.set(`${claim.playerId}:${claim.species}`, entry);
       }
-      if (['caught', 'dead', 'void'].includes(claim.status)) {
+      const wasCaughtBeforeVoid = claim.status === 'void'
+        && caughtResolutionKeys.has(`${area.areaKey}:${claim.playerId}`);
+      if (['caught', 'dead'].includes(claim.status) || wasCaughtBeforeVoid) {
         allCaughtClaims.push(entry);
       }
     }
@@ -206,15 +214,28 @@ export function buildPostRunSummary({
     (a) => (a.visits?.length ?? 0) > 0 || Object.keys(a.claims ?? {}).length > 0 || (a.skips?.length ?? 0) > 0,
   ).length;
   const totalRoutes = Math.max(visitedRoutesCount, regionMap?.sections?.length ?? visitedRoutesCount);
-  const resolvedWildAreas = wildAreas.filter((a) => ['linked', 'caught', 'dead', 'void'].includes(a.status));
-  const successfulWildAreas = wildAreas.filter((a) => ['linked', 'caught', 'dead'].includes(a.status));
+  const areaHasCaughtMon = (a) => Object.values(a.claims ?? {}).some(
+    (c) => ['caught', 'dead'].includes(c?.status)
+      || (c?.status === 'void' && caughtResolutionKeys.has(`${a.areaKey}:${c.playerId}`)),
+  );
+  const successfulWildAreas = wildAreas.filter(
+    (a) => ['linked', 'caught', 'dead'].includes(a.status) || (a.status === 'pending' && areaHasCaughtMon(a)),
+  );
+  const resolvedWildAreas = wildAreas.filter(
+    (a) => ['linked', 'caught', 'dead', 'void'].includes(a.status) || (a.status === 'pending' && areaHasCaughtMon(a)),
+  );
   const missedEncounters = wildAreas.filter((a) => a.status === 'void').length;
   const clauseRerolls = areas.reduce((sum, a) => sum + (a.skips?.length ?? 0), 0);
 
   const totalCatches = allCaughtClaims.length;
+  const wildCaughtCount = allCaughtClaims.filter((c) => !c.isGift).length;
+  const giftCaughtCount = allCaughtClaims.filter((c) => c.isGift).length;
   const catchRatePercent = resolvedWildAreas.length > 0
     ? Math.round((successfulWildAreas.length / resolvedWildAreas.length) * 100)
     : (totalCatches > 0 ? 100 : 0);
+  const catchDetailLabel = wildCaughtCount === 0 && giftCaughtCount > 0 && missedEncounters > 0
+    ? `0 wild caught · ${giftCaughtCount} starter${giftCaughtCount === 1 ? '' : 's'}`
+    : `${totalCatches} Pokémon caught`;
 
   const linksFormed = links.length;
   const linksSurvived = links.filter((l) => l.status === 'active').length;
@@ -387,6 +408,7 @@ export function buildPostRunSummary({
 
   // Superlatives / Run Awards
   const awards = [];
+  const usedAwardSpecies = new Set();
 
   // 1. Day-One Ride-or-Die (MVP)
   const survivingClaims = allCaughtClaims.filter((c) => c.status === 'caught');
@@ -395,6 +417,7 @@ export function buildPostRunSummary({
     const sInfo = safeSpeciesInfo(speciesInfoFor, mvpCandidate.species);
     const survived = mvpCandidate.status === 'caught';
     const monName = mvpCandidate.nickname || sInfo.name;
+    if (mvpCandidate.species) usedAwardSpecies.add(mvpCandidate.species);
     awards.push({
       id: 'mvp',
       icon: '🏆',
@@ -418,8 +441,9 @@ export function buildPostRunSummary({
     }).sort((a, b) => b.score - a.score);
     const best = scoredLinks[0]?.link;
     if (best && (best.members?.length ?? 0) >= 2) {
-      const firstMember = best.members[0];
-      const firstInfo = safeSpeciesInfo(speciesInfoFor, firstMember.species);
+      const featuredMember = best.members.find((m) => m.species && !usedAwardSpecies.has(m.species)) ?? best.members[0];
+      const featuredInfo = safeSpeciesInfo(speciesInfoFor, featuredMember.species);
+      if (featuredMember.species) usedAwardSpecies.add(featuredMember.species);
       const pairNames = best.members.map((m) => {
         const info = safeSpeciesInfo(speciesInfoFor, m.species);
         return `${playerNameFor(m.playerId)}’s ${m.nickname || info.name}`;
@@ -431,9 +455,9 @@ export function buildPostRunSummary({
         title: best.status === 'active' ? 'Unbreakable SoulLink' : 'Flagship SoulLink',
         headline: pairNames,
         detail: `Bonded at ${areaLabel} (${best.status === 'active' ? 'Survived intact' : 'Fell together'}).`,
-        species: firstMember.species,
-        spriteUrl: firstInfo.spriteUrl,
-        playerName: playerNameFor(firstMember.playerId),
+        species: featuredMember.species,
+        spriteUrl: featuredInfo.spriteUrl,
+        playerName: playerNameFor(featuredMember.playerId),
       });
     }
   }
@@ -441,17 +465,20 @@ export function buildPostRunSummary({
   // 3. Heartbreaker (SoulLink collateral damage award)
   const collateralList = graveyard.filter((g) => g.isCollateral);
   if (collateralList.length > 0) {
-    const worstCollateral = [...collateralList].sort((a, b) => (b.level ?? 0) - (a.level ?? 0))[0];
-    const triggerCountByPlayer = new Map();
-    for (const c of collateralList) {
-      triggerCountByPlayer.set(c.triggeredByPlayerId, (triggerCountByPlayer.get(c.triggeredByPlayerId) ?? 0) + 1);
-    }
-    const lvlText = worstCollateral.level ? `Lv ${worstCollateral.level} ` : '';
+    const sortedCollateral = [...collateralList].sort((a, b) => (b.level ?? 0) - (a.level ?? 0));
+    const worstCollateral = sortedCollateral.find((c) => c.species && !usedAwardSpecies.has(c.species)) ?? sortedCollateral[0];
+    if (worstCollateral?.species) usedAwardSpecies.add(worstCollateral.species);
+    const sameTriggerCollateral = collateralList.filter(
+      (c) => c.triggeredByPlayerId === worstCollateral.triggeredByPlayerId,
+    );
+    const victimSummary = sameTriggerCollateral.length > 1
+      ? sameTriggerCollateral.map((c) => `${c.playerName}’s ${c.nickname || c.speciesName}`).slice(0, 2).join(' & ')
+      : `${worstCollateral.playerName}’s ${worstCollateral.level ? `Lv ${worstCollateral.level} ` : ''}${worstCollateral.nickname || worstCollateral.speciesName}`;
     awards.push({
       id: 'heartbreaker',
       icon: '💔',
       title: 'SoulLink Heartbreaker',
-      headline: `${worstCollateral.triggeredByPlayerName} → ${worstCollateral.playerName}’s ${lvlText}${worstCollateral.nickname || worstCollateral.speciesName}`,
+      headline: `${worstCollateral.triggeredByPlayerName} → ${victimSummary}`,
       detail: `${worstCollateral.triggeredByPlayerName}’s faint dragged down ${collateralList.length} linked partner Pokémon across the run.`,
       species: worstCollateral.species,
       spriteUrl: worstCollateral.spriteUrl,
@@ -464,16 +491,17 @@ export function buildPostRunSummary({
     .sort((a, b) => b.deaths.length - a.deaths.length);
   if (splitsWithDeaths.length > 0) {
     const worstSplit = splitsWithDeaths[0];
-    const firstVictim = worstSplit.deaths[0];
+    const featuredVictim = worstSplit.deaths.find((d) => d.species && !usedAwardSpecies.has(d.species)) ?? worstSplit.deaths[0];
+    if (featuredVictim?.species) usedAwardSpecies.add(featuredVictim.species);
     awards.push({
       id: 'deadliest-split',
       icon: '💀',
       title: 'Bloodiest Gym Split',
       headline: `${worstSplit.leader} Split (${worstSplit.deaths.length} Fallen)`,
       detail: `Claimed ${worstSplit.deaths.map((d) => d.nickname || d.speciesName).slice(0, 3).join(', ')} at ${worstSplit.location}.`,
-      species: firstVictim?.species ?? null,
-      spriteUrl: firstVictim?.spriteUrl ?? null,
-      playerName: firstVictim?.playerName ?? null,
+      species: featuredVictim?.species ?? null,
+      spriteUrl: featuredVictim?.spriteUrl ?? null,
+      playerName: featuredVictim?.playerName ?? null,
     });
   }
 
@@ -548,7 +576,7 @@ export function buildPostRunSummary({
       id: 'catches',
       label: 'Catch Conversion',
       value: `${catchRatePercent}%`,
-      detail: `${totalCatches} Pokémon caught`,
+      detail: catchDetailLabel,
     },
     {
       id: 'links',

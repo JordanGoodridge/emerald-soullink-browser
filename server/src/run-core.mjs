@@ -7,6 +7,7 @@ export function createRunService({
   roomService,
   createRunId = randomUUID,
   createSeed = () => randomInt(0, 0x100000000),
+  now = () => Date.now(),
 } = {}) {
   if (!roomService || typeof roomService.inspect !== 'function') throw new Error('run service requires the room service');
   const runs = new Map();
@@ -69,6 +70,7 @@ export function createRunService({
       options: settings,
       members: room.members.map((member) => ({ playerId: member.playerId, name: member.name, active: true })),
       hostPlayerId: room.hostPlayerId ?? room.members[0]?.playerId ?? playerId,
+      startedAt: now(),
     });
     runs.set(roomCode, state);
     return { accepted: true, state };
@@ -139,7 +141,8 @@ export function createRunService({
     if (!state) return { accepted: false, reason: 'run_not_started' };
     const member = state.members.find((candidate) => candidate.playerId === playerId && candidate.active);
     if (!member) return { accepted: false, reason: 'player_not_in_run', state };
-    const result = reduceRunEvent(state, { ...event, playerId });
+    const stampedAt = Number.isFinite(event?.at) ? event.at : now();
+    const result = reduceRunEvent(state, { ...event, playerId, at: stampedAt });
     if (!result.accepted) return result;
     const next = result.state;
     runs.set(roomCode, next);
@@ -161,6 +164,7 @@ export function createRunService({
       playerId,
       nextRunId: createRunId(),
       seed: createSeed(),
+      at: now(),
     });
     if (!reset.accepted) return reset;
     runs.set(roomCode, reset.state);
