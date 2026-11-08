@@ -50,6 +50,10 @@ Before reading adapter or server files, know that these four seams are **100% au
 - **Modifying In-Game Sheets (Party Panel, Move Relearner, Run Tracker, People Map):**
   1. `pokeemerald-3d/web/ui/gameplay-sheets-controller.mjs` (260L) — sheet coordinator in the shell
   2. The specific view file in `pokeemerald-3d/web/ui/` (`party-panel.mjs`, `move-relearner-view.mjs`, `run-tracker.mjs`, `people-map-view.mjs`)
+- **Adding/Editing Avatar Clothing, Headwear, Accessories, or Color Channels:**
+  1. Read `.agents/skills/poketech-avatar-clothing/SKILL.md` first (exact 16-color palette isolation map, 9-frame walking/running `dy`/`dx` anatomy, headband/sleeve gotchas, and contextual `colorChannels`).
+  2. `pokeemerald-3d/web/customization/character-catalog.mjs` & `character-compositor.mjs`
+  3. Run `node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs --slot <slot> --item <id>` to verify pixel placement and palette index isolation.
 
 ---
 
