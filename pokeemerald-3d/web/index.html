@@ -110,29 +110,33 @@
   </dialog>
 
   <dialog id="character-customizer-dialog" class="themed-dialog character-customizer-dialog" aria-labelledby="customizer-title">
-    <div class="dialog-frame">
-      <header class="dialog-header">
-        <h2 id="customizer-title">Customize Character</h2>
-        <button id="customizer-close" class="icon-button" type="button" aria-label="Close character customizer">×</button>
-      </header>
+    <div class="customizer-form dialog-frame">
+      <div class="presence-head">
+        <div>
+          <h2 id="customizer-title">Customize Character</h2>
+          <p class="presence-status">Choose your trainer outfit pieces and palette colors</p>
+        </div>
+        <button id="customizer-close" type="button" aria-label="Close character customizer">Close</button>
+      </div>
       <div class="customizer-layout">
-        <aside class="customizer-preview-pane pixel-frame">
-          <div class="pixel-frame-content customizer-preview-stage">
-            <div class="customizer-pedestal">
-              <canvas id="customizer-preview-canvas" class="customizer-preview-canvas" width="16" height="32" aria-label="Animated character preview"></canvas>
+        <aside class="customizer-preview-card">
+          <div class="customizer-preview-head">
+            <strong>Preview</strong>
+            <span id="customizer-direction-label" class="customizer-direction-badge">Front</span>
+          </div>
+          <div class="customizer-pedestal">
+            <canvas id="customizer-preview-canvas" class="customizer-preview-canvas" width="16" height="32" aria-label="Animated character preview"></canvas>
+          </div>
+          <div class="customizer-preview-controls">
+            <div class="customizer-rotate-row">
+              <button id="customizer-rotate-left" class="customizer-mini-btn" type="button" aria-label="Rotate character left">◀ Turn</button>
+              <button id="customizer-rotate-right" class="customizer-mini-btn" type="button" aria-label="Rotate character right">Turn ▶</button>
             </div>
-            <div class="customizer-preview-controls">
-              <div class="customizer-rotate-row">
-                <button id="customizer-rotate-left" class="dialog-secondary customizer-mini-btn" type="button" aria-label="Rotate character left">◀</button>
-                <span id="customizer-direction-label" class="customizer-direction-label">Front</span>
-                <button id="customizer-rotate-right" class="dialog-secondary customizer-mini-btn" type="button" aria-label="Rotate character right">▶</button>
-              </div>
-              <div class="customizer-motion-row" role="group" aria-label="Preview motion">
-                <button id="customizer-motion-walk" class="dialog-secondary customizer-mini-btn is-active" type="button" aria-pressed="true">Walk</button>
-                <button id="customizer-motion-run" class="dialog-secondary customizer-mini-btn" type="button" aria-pressed="false">Run</button>
-              </div>
-              <button id="customizer-reset" class="dialog-secondary customizer-reset-btn" type="button">Reset Default</button>
+            <div class="customizer-motion-row" role="group" aria-label="Preview motion">
+              <button id="customizer-motion-walk" class="customizer-mini-btn is-active" type="button" aria-pressed="true">Walk</button>
+              <button id="customizer-motion-run" class="customizer-mini-btn" type="button" aria-pressed="false">Run</button>
             </div>
+            <button id="customizer-reset" class="customizer-reset-btn" type="button">Reset Default</button>
           </div>
         </aside>
 
@@ -157,7 +161,7 @@
         </div>
       </div>
       <div class="customizer-footer">
-        <button id="customizer-done" class="dialog-primary" type="button">Done</button>
+        <button id="customizer-done" class="customizer-done-btn" type="button">Done</button>
       </div>
     </div>
   </dialog>
