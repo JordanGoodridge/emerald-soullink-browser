@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs
- *   node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs --slot head --item kitten-ears
+ *   node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs --slot head --item kitten-ears --frames 9
  *   node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs --slot top --item rs-jacket --sheet running
  */
 import {
@@ -38,7 +38,7 @@ const compiled = compileCharacterCustomization(custom, { schema });
 const grid = sheetName === 'running' ? compiled.runningIndexed : compiled.walkingIndexed;
 
 console.log(`=== Sprite Audit: slot=${slot || 'default'} item=${item || 'default'} sheet=${sheetName} ===`);
-console.log('Legend: . = 0(transparent) | 1,2 = skin | 3 = hair | 4,5 = bottom | 6,7 = trim | 8,9 = top | A,B = hat(10,11) | C = white(12) | D,E = grey(13,14) | F = outline(15)\n');
+console.log('Legend: .=0(trans) | 1..4=skin | 5=bottom(pants) | 6,7=trim(2nd) | 8=darkHair/eye | 9,E=head(hat/hair) | A,B=accent(bag/bandana) | C,D=top(shirt/shoes) | F=blackOutline\n');
 
 for (let y = 0; y < 32; y += 1) {
   let line = `y=${String(y).padStart(2, '0')}: `;
@@ -54,17 +54,17 @@ for (let y = 0; y < 32; y += 1) {
 
 // Verify palette index isolation across body zones on Frame 0
 const countsByZone = {
-  headZone_y0_16: new Map(),
-  torsoZone_y17_22: new Map(),
-  legsZone_y23_28: new Map(),
+  headZone_y0_21: new Map(),
+  torsoZone_y22_27: new Map(),
+  legsZone_y28: new Map(),
   shoesZone_y29_31: new Map(),
 };
 
 for (let y = 0; y < 32; y += 1) {
   const zone =
-    y <= 16 ? countsByZone.headZone_y0_16 :
-    y <= 22 ? countsByZone.torsoZone_y17_22 :
-    y <= 28 ? countsByZone.legsZone_y23_28 :
+    y <= 21 ? countsByZone.headZone_y0_21 :
+    y <= 27 ? countsByZone.torsoZone_y22_27 :
+    y === 28 ? countsByZone.legsZone_y28 :
     countsByZone.shoesZone_y29_31;
   for (let x = 0; x < 16; x += 1) {
     const v = grid[y * 144 + x];
