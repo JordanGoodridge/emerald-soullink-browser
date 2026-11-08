@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { createEmeraldRunAdapter } from './run.mjs';
+import { createRunAdapter as createKaizoRunAdapter } from '../../emerald-kaizo/adapter/run.mjs';
+import { createPartyAdapter as createKaizoPartyAdapter, KAIZO_MOVE_NAME_OVERRIDES } from '../../emerald-kaizo/adapter/party.mjs';
+import {
+  createRunSetupCoordinator,
+  isRandomizerDisabledForPack,
+  isRunOptionSupportedByPack,
+} from '../../../pokeemerald-3d/web/run/run-setup-coordinator.mjs';
+import { DEFAULT_RUN_SETTINGS } from '../../../pokeemerald-3d/web/run/run-settings.mjs';
 import { createWasmHelpers } from '../../../pokeemerald-3d/web/packs/shared/runtime-wasm.mjs';
 import { starterChoicesForRun } from '../../../pokeemerald-3d/web/run/starter-choices.mjs';
 import {
@@ -309,4 +317,199 @@ test('Wally tutorial party swap preserves player starter even if a save or safe-
   assert.equal(exportsRef.WasmRunPartyLevel(0), 5);
   assert.equal(exportsRef.WasmRunPartyPidLo(0), starterPidLo);
   assert.equal(exportsRef.WasmRunPartyPidHi(0), starterPidHi);
+});
+
+test('Emerald Kaizo run adapter disables all randomizer hooks and prefixes area keys with emerald-kaizo', async () => {
+  const manifestJson = JSON.parse(
+    await fs.readFile(new URL('../../emerald-kaizo/manifest.json', import.meta.url), 'utf8'),
+  );
+  const adapter = createKaizoRunAdapter({
+    manifest: manifestJson,
+    regionMap: { sections: [{ id: 18, name: 'Route 101' }] },
+  });
+  assert.equal(adapter.id, 'emerald-kaizo');
+  assert.equal(adapter.areaKey({ sectionId: 18, encounterMethod: 'land' }), 'emerald-kaizo:section:18');
+  assert.equal(adapter.areaKey({}, { giftId: 'starter' }), 'emerald-kaizo:gift:starter');
+  assert.deepEqual(adapter.capabilities.randomizer, {
+    wild: false,
+    trainers: false,
+    gyms: false,
+    starters: false,
+  });
+
+  const hooks = createRunEngineHooks({
+    enabled: true,
+    seed: 'kaizo-no-randomizer',
+    adapter,
+    exports: {
+      WasmRunSpeciesCount: () => 411,
+      WasmRunSpeciesAt: (index) => index + 1,
+    },
+    options: {
+      randomizeWild: true,
+      randomizeTrainers: true,
+      randomizeGyms: true,
+      randomizeStarters: true,
+    },
+  });
+  for (const kind of [RUN_KIND_WILD, RUN_KIND_TRAINER, RUN_KIND_GYM, RUN_KIND_ELITE, RUN_KIND_CHAMPION, RUN_KIND_STARTER]) {
+    assert.equal(hooks.WasmRunRandomSpecies(kind, 277, 1, 1), 277);
+  }
+});
+
+test('Emerald Kaizo party adapter overrides all 28 modified Kaizo move names', () => {
+  const exports = {
+    WasmRunPartyCount: () => 1,
+    WasmRunPartySpecies: () => 277,
+    WasmRunPartyLevel: () => 50,
+    WasmRunPartyPidLo: () => 0x1234,
+    WasmRunPartyPidHi: () => 0x5678,
+    WasmRunPartyMove: (_slot, moveSlot) => [32, 90, 314, 284][moveSlot] ?? 0,
+    WasmRunRelearnableMoveCount: () => 2,
+    WasmRunRelearnableMoveAt: (_slot, index) => [319, 124][index] ?? 0,
+  };
+  const party = createKaizoPartyAdapter({ exports });
+  assert.equal(Object.keys(KAIZO_MOVE_NAME_OVERRIDES).length, 28);
+  const mon = party.readMoveRelearnerMon(0);
+  assert.deepEqual(
+    mon.moves.map((id) => party.moveName(id)),
+    ['Drill Run', 'Earth Power', 'Air Slash', 'Draco Meteor'],
+  );
+  assert.deepEqual(
+    mon.levelUpMoves.map((id) => party.moveName(id)),
+    ['Flash Cannon', 'Sludge Bomb'],
+  );
+  assert.equal(party.moveName(1), 'POUND');
+});
+
+test('Run setup coordinator disables randomizer checkboxes and shows Kaizo notice when pack disables randomizer', async () => {
+  const kaizoManifest = JSON.parse(
+    await fs.readFile(new URL('../../emerald-kaizo/manifest.json', import.meta.url), 'utf8'),
+  );
+  assert.equal(isRandomizerDisabledForPack(kaizoManifest), true);
+  for (const key of [
+    'randomizeWild',
+    'powerBalanceWild',
+    'randomizeTrainers',
+    'powerBalanceTrainers',
+    'randomizeGyms',
+    'powerBalanceGyms',
+    'randomizeStarters',
+  ]) {
+    assert.equal(isRunOptionSupportedByPack(key, kaizoManifest), false, `${key} should be unsupported`);
+  }
+  for (const key of [
+    'gymLevelCap',
+    'infiniteRareCandies',
+    'rareCandyPartyLevelCeiling',
+    'infiniteMoney',
+    'allowLinkedPcBoxing',
+    'moveRelearner',
+  ]) {
+    assert.equal(isRunOptionSupportedByPack(key, kaizoManifest), true, `${key} should remain supported`);
+  }
+
+  const makeCheckbox = (option) => {
+    const label = {
+      dataset: {},
+      title: '',
+      removeAttribute(attr) { delete this[attr]; },
+    };
+    return {
+      dataset: { runOption: option },
+      checked: true,
+      disabled: false,
+      closest: (sel) => (sel === 'label' ? label : null),
+      addEventListener() {},
+      _label: label,
+    };
+  };
+  const runOptionInputs = Object.fromEntries(
+    Object.keys(DEFAULT_RUN_SETTINGS).map((key) => [key, makeCheckbox(key)]),
+  );
+  const noteEl = { textContent: '' };
+  const prevDoc = globalThis.document;
+  globalThis.document = {
+    body: { dataset: {} },
+    querySelector: (sel) => (sel === '#presence-run-settings-note' ? noteEl : null),
+  };
+  try {
+    const runSettings = { mode: 'soullink', ...DEFAULT_RUN_SETTINGS };
+    const coordinator = createRunSetupCoordinator({
+      elements: {
+        runSetupFieldset: { hidden: true },
+        runModeNote: { hidden: true, textContent: '' },
+        runOptionInputs,
+      },
+      presence: {
+        getSnapshot: () => ({
+          status: 'joined',
+          room: 'KAIZO1',
+          playerId: 'p1',
+          isRoomCreator: true,
+          members: [{ playerId: 'p1', name: 'Host' }],
+        }),
+        getParties: () => ({}),
+      },
+      presenceLobby: {},
+      getPackManifest: () => kaizoManifest,
+      getRunSettings: () => runSettings,
+      setRunSettings: () => {},
+      getRunRuntime: () => ({
+        peekState: () => null,
+        state: () => null,
+      }),
+      getRunAdapter: () => ({
+        starterChoices: [277, 280, 283],
+        capabilities: kaizoManifest.run.capabilities,
+      }),
+    });
+
+    coordinator.renderRunSetup();
+
+    for (const [key, input] of Object.entries(runOptionInputs)) {
+      if (!isRunOptionSupportedByPack(key, kaizoManifest)) {
+        assert.equal(input.checked, false, `${key} should be unchecked`);
+        assert.equal(input.disabled, true, `${key} should be disabled`);
+        assert.equal(input._label.dataset.packDisabled, 'true');
+      } else {
+        assert.equal(input.disabled, false, `${key} should remain enabled for host`);
+      }
+    }
+    assert.match(noteEl.textContent, /Randomization is disabled for Emerald Kaizo/);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('Emerald Kaizo WASM binary unlocks National Dex on quick-start and exposes full 386 species table', async () => {
+  const wasmUrl = new URL('../../emerald-kaizo/dist/pokeemeraldkaizo.wasm', import.meta.url);
+  const savUrl = new URL('../../emerald-kaizo/resources/soullink-base.sav', import.meta.url);
+  const wasmBytes = await fs.readFile(wasmUrl);
+  const mod = await WebAssembly.compile(wasmBytes);
+  let views = null;
+  let exportsRef = null;
+  const adapter = createKaizoRunAdapter();
+  const hooks = createRunEngineHooks({
+    enabled: () => true,
+    seed: 'kaizo-wasm-test',
+    adapter,
+    getExports: () => exportsRef,
+  });
+  const helpers = createWasmHelpers(() => views);
+  const inst = await WebAssembly.instantiate(mod, helpers.createImports(mod, { runHooks: hooks }));
+  exportsRef = inst.exports;
+  const b = exportsRef.memory.buffer;
+  views = { u8: new Uint8Array(b), u16: new Uint16Array(b), u32: new Uint32Array(b) };
+  views.u16[0x04000130 >> 1] = 0x03ff;
+  exportsRef.AgbMain();
+  const sav = await fs.readFile(savUrl);
+  views.u8.set(sav, 0x0e000000);
+  assert.equal(exportsRef.WasmRunLoadBaseSave(), 1);
+  for (let i = 0; i < 60; i++) exportsRef.WasmRunFrame();
+  assert.equal(exportsRef.WasmRunReplaceStarter(277), 1);
+  assert.equal(exportsRef.IsNationalPokedexEnabled(), 1);
+  assert.equal(exportsRef.WasmRunSpeciesCount(), 386);
+  assert.equal(typeof exportsRef.WasmAudioSampleRate, 'function');
+  assert.equal(typeof exportsRef.WasmAudioAvailableFrames, 'function');
 });

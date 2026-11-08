@@ -11,6 +11,36 @@ import { renderStarterChoiceCards } from '../ui/starter-picker.mjs';
 import { getEmeraldSpeciesInfo } from '../packs/shared/species-names-emerald.mjs';
 import { libraryUrl } from '../packs/registry.mjs';
 
+const RANDOMIZER_CAPABILITY_BY_OPTION = Object.freeze({
+  randomizeWild: 'wild',
+  powerBalanceWild: 'wild',
+  randomizeTrainers: 'trainers',
+  powerBalanceTrainers: 'trainers',
+  randomizeGyms: 'gyms',
+  powerBalanceGyms: 'gyms',
+  randomizeStarters: 'starters',
+});
+
+export function isRunOptionSupportedByPack(key, packManifest = null, runAdapter = null) {
+  const capKey = RANDOMIZER_CAPABILITY_BY_OPTION[key];
+  if (!capKey) return true;
+  const manifestRandomizer = packManifest?.run?.capabilities?.randomizer;
+  if (manifestRandomizer && typeof manifestRandomizer[capKey] === 'boolean') {
+    return manifestRandomizer[capKey];
+  }
+  const adapterRandomizer = runAdapter?.capabilities?.randomizer;
+  if (adapterRandomizer && typeof adapterRandomizer[capKey] === 'boolean') {
+    return adapterRandomizer[capKey];
+  }
+  return true;
+}
+
+export function isRandomizerDisabledForPack(packManifest = null, runAdapter = null) {
+  return Object.keys(RANDOMIZER_CAPABILITY_BY_OPTION).every(
+    (key) => !isRunOptionSupportedByPack(key, packManifest, runAdapter),
+  );
+}
+
 export function createRunSetupCoordinator({
   automate = false,
   soulLinkPregameRequested = false,
@@ -148,10 +178,23 @@ export function createRunSetupCoordinator({
               : `${roomLine}Waiting for the host to start.`;
     }
     if (soulLinkPregameBackButton) soulLinkPregameBackButton.hidden = active;
+    const runAdapter = getRunAdapter();
+    const gameTitle = packManifest?.game?.title ?? 'this game';
     for (const [key, input] of Object.entries(runOptionInputs)) {
       if (input) {
-        input.checked = options[key] === true;
-        input.disabled = !connected || !isHost || active || Boolean(selectedSavedSoulLink);
+        const supported = isRunOptionSupportedByPack(key, packManifest, runAdapter);
+        input.checked = supported && options[key] === true;
+        input.disabled = !supported || !connected || !isHost || active || Boolean(selectedSavedSoulLink);
+        const label = input.closest?.('label');
+        if (label) {
+          if (!supported) {
+            if (label.dataset) label.dataset.packDisabled = 'true';
+            label.title = `Disabled for ${gameTitle} — handcrafted encounters, trainers, and starters are fixed for Nuzlocke / SoulLink`;
+          } else {
+            if (label.dataset) delete label.dataset.packDisabled;
+            label.removeAttribute?.('title');
+          }
+        }
       }
     }
     if (runStartButton) {
@@ -166,16 +209,19 @@ export function createRunSetupCoordinator({
         || (setupPolicy.requireRoomToStart && !runClient?.attached);
       runStartButton.textContent = isHost ? 'Start run' : 'Waiting for host';
     }
+    const randomizerDisabledForPack = isRandomizerDisabledForPack(packManifest, runAdapter);
     const note = document.querySelector('#presence-run-settings-note');
     if (note) {
       note.textContent = selectedSavedSoulLink
         ? `Saved settings · ${selectedSavedSoulLink.runState?.seed ?? 'unknown seed'} · locked`
-        : soulLinkPregameRequested
-          ? 'Shared seed and category toggles; enabled randomization is per player.'
-          : active
-            ? `Run seed ${shared.seed} · settings locked for this run.`
-            : isHost ? 'Host chooses shared settings and the run seed. Enabled randomization differs by player.'
-              : 'The room host chooses shared rules and randomizer settings.';
+        : randomizerDisabledForPack
+          ? `Randomization is disabled for ${gameTitle} — handcrafted encounters, trainers, and starters are locked for Nuzlocke / SoulLink.`
+          : soulLinkPregameRequested
+            ? 'Shared seed and category toggles; enabled randomization is per player.'
+            : active
+              ? `Run seed ${shared.seed} · settings locked for this run.`
+              : isHost ? 'Host chooses shared settings and the run seed. Enabled randomization differs by player.'
+                : 'The room host chooses shared rules and randomizer settings.';
     }
 
     if (groupWipeScreen) groupWipeScreen.hidden = !postRunOpen;
@@ -411,11 +457,21 @@ export function createRunSetupCoordinator({
       return;
     }
     try {
+      const packManifest = getPackManifest();
+      const runAdapter = getRunAdapter();
       const patch = Object.fromEntries(
         Object.entries(runOptionInputs)
           .filter(([, input]) => Boolean(input))
-          .map(([key, input]) => [key, input.checked]),
+          .map(([key, input]) => [
+            key,
+            isRunOptionSupportedByPack(key, packManifest, runAdapter) ? Boolean(input.checked) : false,
+          ]),
       );
+      for (const key of Object.keys(RANDOMIZER_CAPABILITY_BY_OPTION)) {
+        if (!isRunOptionSupportedByPack(key, packManifest, runAdapter)) {
+          patch[key] = false;
+        }
+      }
       if (typeof patch.rareCandyPartyLevelCeiling === 'boolean') {
         patch.infiniteRareCandies = patch.rareCandyPartyLevelCeiling;
       }
@@ -503,6 +559,11 @@ export function createRunSetupCoordinator({
       input?.addEventListener('change', () => {
         const runRuntime = getRunRuntime();
         if (!runRuntime || runRuntime.state()) return;
+        if (!isRunOptionSupportedByPack(key, getPackManifest(), getRunAdapter())) {
+          input.checked = false;
+          renderRunSetup();
+          return;
+        }
         try {
           const patch = { [key]: input.checked };
           if (input.checked) {

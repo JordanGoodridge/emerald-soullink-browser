@@ -67,4 +67,5 @@ pack-e2e-output/
 game-packs/*/dist/
 game-packs/*/cover.png
 game-packs/emerald/resources/hoenn-region-map.png
+game-packs/emerald-kaizo/resources/hoenn-region-map.png
 pokeemerald-3d/wasm-replay-*/

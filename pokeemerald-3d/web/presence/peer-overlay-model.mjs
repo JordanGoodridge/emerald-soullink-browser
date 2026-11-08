@@ -6,9 +6,9 @@
 
 import { computeIndicators, indicatorHue } from './player-indicators.mjs';
 
-// The remote sprite is a 16x32 avatar standing on the footpoint, so the tag
-// sits just above the head with a small gap.
-export const TAG_HEAD_OFFSET = 34;
+// The remote sprite is a 16x32 avatar cell whose top 10 rows are transparent
+// (visible sprite height is 22px), so the tag sits right above the visible head.
+export const TAG_HEAD_OFFSET = 23;
 
 function displayName(members, playerId) {
   const found = members.find((member) => member?.playerId === playerId);

@@ -63,6 +63,7 @@ All production WASM files fit in a single `read_file` call (`<800` lines):
   - `L303–466`: Party & Move Relearner accessors (`WasmRunParty*`, `WasmRunRelearnableMoveCount`/`At`, `WasmRunSetPartyMove`, `WasmRunPokeballCount`, `WasmRunIsCaught`, `WasmRunEnemyParty*`)
   - `L468–634`: Release, Quick-Start & Base Save (`WasmRunReleasePid`, `WasmRunApplyPostStarterFlags`, `WasmRunQuickStart`, `WasmRunLoadBaseSave`, `WasmRunReplaceStarter`, `WasmRunQuickStartSave`, `WasmCanSaveGame`, `WasmRunGiveStarterPokeballs`)
   - `L636–773`: Safe-point faint/release processing (`WasmRunProcessSafePoint`, `WasmRunFlushPendingReleases`)
+  - `L775–850`: Player sprite & palette customization (`WasmPlayerPaletteBuffer`, `WasmPlayerReflectionPaletteBuffer`, `WasmPlayerNormalPicBuffer`, `WasmPlayerRunningPicBuffer`, `WasmApplyPlayerCustomization`)
 - `pokeemerald-3d/src/wasm_run_debug.c` (128L) — `WasmRunDebug*` test helpers
 - `pokeemerald-3d/src/wasm_presence.c` (265L) — overworld presence state exports (`WasmPresence*`)
 - `pokeemerald-3d/src/wasm_display.c` (620L) — HD-2D & classic scene extraction buffers
@@ -120,18 +121,25 @@ All production WASM files fit in a single `read_file` call (`<800` lines):
 - `pokeemerald-3d/web/run/client.mjs` (230L) & `run-protocol.mjs` (111L) — WebSocket `/run` client & wire validation
 - `pokeemerald-3d/web/run/randomizer.mjs` (135L), `soul-link.mjs` (115L), `starter-choices.mjs` (60L), `tracker-model.mjs` (215L), `notice-model.mjs` (155L), `move-relearner.mjs` (70L), `move-history.mjs` (95L), `nuzlocke-bundle.mjs` (140L)
 
+### Character Customization (`pokeemerald-3d/web/customization/`)
+- `pokeemerald-3d/web/customization/character-catalog.mjs` (245L) — Protagonist rig registry (`gen3-brendan`), semantic color ramps, modular clothing slots (`head`, `top`, `bottom`), and multi-game extension (`extendCharacterRigForGame`, `registerCharacterRig`)
+- `pokeemerald-3d/web/customization/character-compositor.mjs` (295L) — 4bpp GBA tile + 15-bit BGR555 palette + RGBA sprite-sheet compositor
+- `pokeemerald-3d/web/customization/character-store.mjs` (165L) — `localStorage` persistence & subscriber store for character customization
+- `pokeemerald-3d/web/customization/brendan-sheets-data.mjs` (20L) — 4bpp walking & running base sheets and default palette for Brendan
+
 ### UI Views (`pokeemerald-3d/web/ui/`)
 - `pokeemerald-3d/web/ui/gameplay-sheets-controller.mjs` (260L) — Coordinator for People Map, Party Panel, Move Relearner, Run Tracker, and Run Notices
+- `pokeemerald-3d/web/ui/character-customizer-view.mjs` (285L) — Main Menu (`#library`) Character Customizer dialog controller & live sprite preview
 - `pokeemerald-3d/web/ui/party-panel.mjs` (285L), `run-tracker.mjs` (185L), `move-relearner-view.mjs` (125L), `people-map-view.mjs` (185L), `saved-lobbies-view.mjs` (195L), `starter-picker.mjs` (80L), `overworld-peer-dom.mjs` (190L), `game-library.mjs` (275L), `library-model.mjs` (210L), `game-menu.mjs` (130L)
 
 ### CSS Stylesheets (`pokeemerald-3d/web/styles/`)
 > Edit the focused module directly (`style.css` and `library.css` are `@import` entrypoints):
 - **Base Shell (`style.css`):** `base-shell.css` (643L), `presence-and-dialogs-base.css` (319L), `overworld-overlays.css` (108L), `sheets-and-map.css` (382L)
-- **Library & Framed Pixel Theme (`library.css`):** `library-core.css` (965L), `library-framed-theme.css` (662L), `library-sheets.css` (493L), `library-friends-and-lobbies.css` (1,051L)
+- **Library & Framed Pixel Theme (`library.css`):** `library-core.css` (965L), `library-framed-theme.css` (1,080L), `library-sheets.css` (493L), `library-friends-and-lobbies.css` (1,051L)
 
 ### Presence, Packs & Server (`pokeemerald-3d/web/presence/`, `packs/`, `server/src/`)
 - **Presence (`pokeemerald-3d/web/presence/`):** `runtime.mjs` (496L), `presence-client.mjs` (543L), `remote-actors.mjs` (426L), `protocol.mjs` (393L), `lobby.mjs` (335L), `peer-overlay-model.mjs` (235L), `party-panel-model.mjs` (215L)
-- **Game Packs (`game-packs/emerald/adapter/` & `pokeemerald-3d/web/packs/`):** `game-packs/emerald/adapter/run.mjs` (172L), `rules.mjs` (105L), `party.mjs` (45L), `runtime.mjs` (25L); `web/packs/emerald-compat.mjs` (97L), `shared/runtime-wasm.mjs` (297L), `shared/party-emerald.mjs` (195L), `shared/save-codec-emerald.mjs` (375L), `shared/scene-emerald.mjs` (255L), `shared/world-emerald.mjs` (175L)
+- **Game Packs (`game-packs/emerald/`, `game-packs/emerald-kaizo/`, & `pokeemerald-3d/web/packs/`):** `game-packs/emerald/adapter/run.mjs` (205L), `rules.mjs` (105L), `party.mjs` (45L), `runtime.mjs` (25L); `game-packs/emerald-kaizo/adapter/run.mjs`, `rules.mjs`, `party.mjs`, `runtime.mjs`, `build/build.mjs`; `web/packs/emerald-compat.mjs` (139L), `shared/runtime-wasm.mjs` (297L), `shared/party-emerald.mjs` (225L), `shared/save-codec-emerald.mjs` (375L), `shared/scene-emerald.mjs` (255L), `shared/world-emerald.mjs` (175L)
 - **Server (`server/src/` — ONLY 3 files exist):** `server/src/server.mjs` (645L — HTTP/WS relay), `server/src/room-core.mjs` (441L — presence rooms), `server/src/run-core.mjs` (345L — SoulLink run state authority)
 
 ---
@@ -141,10 +149,12 @@ All production WASM files fit in a single `read_file` call (`<800` lines):
 - **Fast surgical search across C decomp files (use 1 batched call instead of multi-chunk `read_file`):**
   `git grep -n "PatternA\|PatternB" pokeemerald-3d/src/ pokeemerald-3d/include/`
 - **Run fast unit tests quietly (~1.5s, dot reporter avoids TAP log spam):**
-  `node --test --test-reporter=dot pokeemerald-3d/web/ui/*.test.mjs pokeemerald-3d/web/run/*.test.mjs game-packs/emerald/adapter/*.test.mjs server/test/*.test.mjs pokeemerald-3d/tools/*.test.mjs`
+  `node --test --test-reporter=dot pokeemerald-3d/web/customization/*.test.mjs pokeemerald-3d/web/ui/*.test.mjs pokeemerald-3d/web/run/*.test.mjs game-packs/emerald/adapter/*.test.mjs server/test/*.test.mjs pokeemerald-3d/tools/*.test.mjs`
 - **Run 3D terrain & building renderer regression tests (<1s):**
   `node pokeemerald-3d/tools/test_building_rendering.mjs`
 - **Assemble static `dist` bundle quietly (~1s):**
   `node deploy/build-dist.mjs`
-- **Rebuild WASM in parallel across all cores (only after editing `.c` / `.h` files in `pokeemerald-3d/`):**
+- **Rebuild WASM in parallel across all cores (builds both Emerald and Emerald Kaizo):**
   `.\build-wasm.ps1`
+- **Save upstream C/Makefile modifications into `patches/pokeemerald-wasm.patch` and `patches/emerald-kaizo-wasm.patch`:**
+  `node tools/save-upstream-patch.mjs`

@@ -34,9 +34,9 @@
       "group": "boot",
       "embedded": false,
       "url": "dist/pokeemeraldkaizo.wasm",
-      "sha256": "f95b13df92ea2080d468c17606dc587d998e2ec1605144ce4fae1f18ff6cf6aa",
+      "sha256": "pending",
       "mediaType": "application/wasm",
-      "bytes": 12347701
+      "bytes": 268435456
     },
     "entry": ["AgbMain", "WasmRunFrame"],
     "initialMemoryBytes": 268435456,
@@ -89,7 +89,25 @@
       "WasmPresenceMotion",
       "WasmPresenceGender",
       "WasmPresenceAnimCmdIndex",
-      "WasmPresenceSpritePriority"
+      "WasmPresenceSpritePriority",
+      "WasmRunPartyMove",
+      "WasmRunRelearnableMoveCount",
+      "WasmRunRelearnableMoveAt",
+      "WasmRunSetPartyMove",
+      "WasmRunLoadBaseSave",
+      "WasmRunReplaceStarter",
+      "WasmRunGetMoney",
+      "WasmRunSetMoney",
+      "WasmRunIsChampion",
+      "WasmAudioSampleRate",
+      "WasmAudioAvailableFrames",
+      "WasmAudioBufferPtr",
+      "WasmAudioConsumeFrames",
+      "WasmPlayerPaletteBuffer",
+      "WasmPlayerReflectionPaletteBuffer",
+      "WasmPlayerNormalPicBuffer",
+      "WasmPlayerRunningPicBuffer",
+      "WasmApplyPlayerCustomization"
     ]
   },
   "rendering": {
@@ -107,9 +125,9 @@
       "group": "boot",
       "embedded": false,
       "url": "dist/pokeemeraldkaizo.wasm",
-      "sha256": "f95b13df92ea2080d468c17606dc587d998e2ec1605144ce4fae1f18ff6cf6aa",
+      "sha256": "pending",
       "mediaType": "application/wasm",
-      "bytes": 12347701
+      "bytes": 268435456
     },
     {
       "id": "map-names",
@@ -119,6 +137,35 @@
       "url": "dist/map-names.json",
       "sha256": "pending",
       "mediaType": "application/json"
+    },
+    {
+      "id": "region-map",
+      "kind": "data",
+      "group": "optional",
+      "embedded": false,
+      "url": "dist/region-map.json",
+      "sha256": "pending",
+      "mediaType": "application/json"
+    },
+    {
+      "id": "region-map-art",
+      "kind": "image",
+      "group": "optional",
+      "embedded": false,
+      "url": "resources/hoenn-region-map.png",
+      "sha256": "pending",
+      "mediaType": "image/png",
+      "bytes": 85798
+    },
+    {
+      "id": "soullink-base-save",
+      "kind": "data",
+      "group": "optional",
+      "embedded": false,
+      "url": "resources/soullink-base.sav",
+      "sha256": "pending",
+      "mediaType": "application/octet-stream",
+      "bytes": 131072
     },
     {
       "id": "avatar.brendan",
@@ -172,13 +219,44 @@
     ]
   },
   "nuzlocke": {
-    "support": "none"
+    "support": "enforce",
+    "adapter": "adapter/rules.mjs",
+    "areas": "region-map",
+    "clauses": {
+      "nicknameRequired": false
+    },
+    "requiredHooks": ["encounter", "captureGate", "faintRelease", "reviveGate"]
+  },
+  "run": {
+    "adapter": "adapter/run.mjs",
+    "support": "enforce",
+    "modes": ["nuzlocke", "soullink"],
+    "regionMapResource": "region-map",
+    "quickStartBaseResource": "soullink-base-save",
+    "capabilities": {
+      "encounter": "enforce",
+      "captureGate": "enforce",
+      "faintRelease": "enforce",
+      "reviveGate": "enforce",
+      "linkedPcBoxing": "enforce",
+      "quickStart": "table",
+      "tracker": "map-data",
+      "randomizer": {
+        "wild": false,
+        "trainers": false,
+        "gyms": false,
+        "starters": false
+      }
+    }
+  },
+  "party": {
+    "adapter": "adapter/party.mjs"
   },
   "interiorSupport": "inherited",
   "capabilities": {
     "rendering": ["hd2d", "classic"],
     "presence": "readonly",
-    "rules": "none",
+    "rules": "enforce",
     "link": "none",
     "customUi": false
   },

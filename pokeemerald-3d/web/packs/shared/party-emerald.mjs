@@ -14,12 +14,30 @@ import {
 import { speciesName } from './species-names-emerald.mjs';
 import { EMERALD_MOVE_NAMES, moveName } from './move-names-emerald.mjs';
 
-export function createEmeraldPartyModel({ exports = null } = {}) {
+export function createEmeraldPartyModel({
+  exports = null,
+  speciesNames = null,
+  moveNames = null,
+} = {}) {
   let wasm = exports;
   let revision = 0;
   // A null sentinel forces the first observed content (even an empty party) to
   // advance the revision, matching the world model's first-read epoch bump.
   let lastSignature = null;
+
+  function resolveSpeciesName(id) {
+    if (speciesNames && Object.prototype.hasOwnProperty.call(speciesNames, id)) {
+      return speciesNames[id] ?? null;
+    }
+    return speciesName(id);
+  }
+
+  function resolveMoveName(id) {
+    if (moveNames && Object.prototype.hasOwnProperty.call(moveNames, id)) {
+      return moveNames[id] ?? null;
+    }
+    return moveName(id);
+  }
 
   function bind(nextExports) {
     wasm = nextExports;
@@ -38,7 +56,7 @@ export function createEmeraldPartyModel({ exports = null } = {}) {
       if (!Number.isInteger(species) || species <= 0) continue;
       const member = normalizePartyMember({
         species,
-        speciesName: speciesName(species) ?? undefined,
+        speciesName: resolveSpeciesName(species) ?? undefined,
         level: wasm.WasmRunPartyLevel?.(index) ?? null,
         hp: wasm.WasmRunPartyHp?.(index) ?? null,
       });
@@ -98,15 +116,20 @@ export function createEmeraldPartyModel({ exports = null } = {}) {
     }
   }
 
+  const mergedMoveIds = [
+    ...Object.keys(EMERALD_MOVE_NAMES),
+    ...Object.keys(moveNames ?? {}),
+  ];
+
   return {
     bind,
     read,
     readMoveRelearnerMon,
     setMove,
     rememberMoves,
-    speciesName,
-    moveName,
-    maxMoveId: Object.keys(EMERALD_MOVE_NAMES).reduce((max, id) => Math.max(max, Number(id)), 0),
+    speciesName: resolveSpeciesName,
+    moveName: resolveMoveName,
+    maxMoveId: mergedMoveIds.reduce((max, id) => Math.max(max, Number(id)), 0),
     get revision() { return revision; },
   };
 }

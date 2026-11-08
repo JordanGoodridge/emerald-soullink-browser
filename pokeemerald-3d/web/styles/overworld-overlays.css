@@ -9,21 +9,25 @@
 
 .remote-badge {
   position: absolute;
-  transform: translate(-50%, -100%);
+  display: inline-flex;
+  align-items: center;
+  transform: translate(-50%, calc(-100% - 3px));
   margin: 0;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(21, 37, 64, 0.94);
-  border: 1.5px solid var(--gold);
-  color: var(--gold);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: clamp(11px, 1.5vmin, 13px);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: .03em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(242, 206, 104, 0.96);
+  border: 1.5px solid #152540;
+  color: #152540;
+  font-family: var(--font-pixel);
+  font-size: clamp(11px, 1.55vmin, 13px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  text-shadow: none;
+  box-shadow:
+    0 2px 0 rgba(21, 37, 64, 0.65),
+    inset 0 1px 0 rgba(255, 253, 241, 0.75);
 }
 
 .remote-badges.with-peer-tags .remote-badge {
@@ -32,20 +36,37 @@
 
 .remote-arrow {
   position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   transform: translate(-50%, -50%);
   margin: 0;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(21, 37, 64, 0.94);
-  border: 1.5px solid hsl(var(--hue, 160) 75% 62%);
-  color: #fffdf1;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: clamp(11px, 1.6vmin, 13px);
-  font-weight: 700;
-  line-height: 1.15;
+  padding: 2px 8px 2px 6px;
+  border-radius: 4px;
+  background: rgba(248, 245, 232, 0.95);
+  border: 1.5px solid #152540;
+  color: #152540;
+  font-family: var(--font-pixel);
+  font-size: clamp(11px, 1.65vmin, 14px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  text-shadow: none;
+  box-shadow:
+    0 2px 0 rgba(21, 37, 64, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.remote-arrow:not(.has-icon)::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: hsl(var(--hue, 160) 72% 48%);
+  border: 1px solid #152540;
 }
 
 /* Shoulder buttons: L/R were previously keyboard-only. */
@@ -79,21 +100,50 @@
 
 .peer-tag {
   position: absolute;
-  transform: translate(-50%, -100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transform: translate(-50%, calc(-100% - 3px));
   margin: 0;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(21, 37, 64, 0.94);
-  border: 1.5px solid hsl(var(--hue, 160) 75% 64%);
-  color: #fffdf1;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: clamp(12px, 1.75vmin, 14px);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: .02em;
+  padding: 2px 7px 2px 5px;
+  border-radius: 4px;
+  background: rgba(248, 245, 232, 0.95);
+  border: 1.5px solid #152540;
+  color: #152540;
+  font-family: var(--font-pixel);
+  font-size: clamp(12px, 1.75vmin, 15px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  text-shadow: none;
+  box-shadow:
+    0 2px 0 rgba(21, 37, 64, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.peer-tag::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: hsl(var(--hue, 160) 72% 48%);
+  border: 1px solid #152540;
+}
+
+.peer-tag::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4.5px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #152540;
 }
 
 .remote-arrow.has-icon::before {
@@ -101,8 +151,7 @@
   display: inline-block;
   width: 10px;
   height: 20px;
-  margin-right: 4px;
-  vertical-align: -5px;
+  flex: 0 0 10px;
   background-image: var(--peer-icon);
   background-repeat: no-repeat;
   background-position: center;

@@ -1,8 +1,8 @@
 # Emerald SoulLink Browser
 
-Play 2–4 player Emerald SoulLink and Nuzlocke runs in the browser on top of [`tripplyons/pokeemerald-wasm`](https://github.com/tripplyons/pokeemerald-wasm).
+Play 2–4 player Emerald and Emerald Kaizo SoulLink and Nuzlocke runs in the browser on top of [`tripplyons/pokeemerald-wasm`](https://github.com/tripplyons/pokeemerald-wasm) and [`CreamElDudJafar/Pokemon-Emerald-Kaizo`](https://github.com/CreamElDudJafar/Pokemon-Emerald-Kaizo).
 
-This repo only contains the multiplayer server, browser UI, and a patch (`patches/pokeemerald-wasm.patch`). The game files are downloaded from `pokeemerald-wasm` when you run `.\install.ps1`.
+This repo only contains the multiplayer server, browser UI, game-pack adapters, and source patches (`patches/pokeemerald-wasm.patch` and `patches/emerald-kaizo-wasm.patch`). The upstream game trees are downloaded and patched automatically when you run `.\install.ps1`.
 
 <p align="center">
   <a href="docs/screenshots/overworld-coop.jpg"><img src="docs/screenshots/overworld-coop.jpg" alt="3D Multiplayer Overworld in Littleroot Town" width="680"></a>
@@ -15,6 +15,7 @@ This repo only contains the multiplayer server, browser UI, and a patch (`patche
 ### Online Multiplayer & Lobbies
 - **Room Codes:** Host a room, share a 6-character code (or link), and pick rules in the lobby.
 - **See Friends in the Overworld:** Up to 4 players walk, run, bike, jump ledges, and surf on the same map in 3D/HD-2D or Classic 2D.
+- **Character Customization:** Customize your trainer's outfit pieces (headwear, top/shirt, pants & shoes) and palette colors (shirt & shoes, bandana & bag, hat/hair, pants, skin tone) from the **Customize** sheet on the Main Menu.
 - **Live Party & Map View:** Inspect anyone's current party, HP, and moves, see an icon over their head when they're in a battle, and press `M` to see everyone on the Hoenn map.
 - **Starter Draft & Quick-Start:** Everyone picks from 3 starters in the lobby and spawns directly on Route 101 with the Pokedex, Running Shoes, and 5 Poke Balls (skips the truck/Birch intro).
 - **Save Sync & Resume:** Saves and run progress sync across players automatically. You can close the game and resume the lobby later, export `.ptnuzlocke` backups, or let a friend take over an open player slot.
@@ -37,8 +38,8 @@ This repo only contains the multiplayer server, browser UI, and a patch (`patche
 - **QoL Toggles:** Infinite Rare Candies, start with Max Money (`999,999`), and a built-in **Move Relearner** menu.
 
 ### Other Games
-- **Emerald** is the main focus and supports all SoulLink, Nuzlocke, and randomizer features.
-- **Emerald Kaizo** has basic support (boots in Standard mode with saves and overworld player visibility, no SoulLink hooks). Other ROM hacks might be added later.
+- **Emerald** supports all SoulLink, Nuzlocke, and randomizer features.
+- **Emerald Kaizo** supports full Multiplayer SoulLink and Nuzlocke runs, Standard Co-Op, WebAudio sound, live party/move inspection (including Kaizo's 26 custom move slots), and the full 386-Pokémon National Dex on quick-start. Randomizer toggles are automatically disabled in the lobby to preserve Kaizo's handcrafted encounters, trainers, and starters.
 
 ---
 
@@ -71,10 +72,10 @@ If you want a public `https://` link anyone can click without setting up VPNs or
 Requires Node 22+, Git, and MSYS2 UCRT64 at `.toolchain/msys64`.
 
 ```powershell
-# 1. Download upstream pokeemerald-wasm and apply our patch
+# 1. Download upstream pokeemerald-wasm + Pokemon-Emerald-Kaizo and apply patches
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 
-# 2. Build the WASM file
+# 2. Build both Emerald and Emerald Kaizo WASM runtimes
 powershell -ExecutionPolicy Bypass -File .\build-wasm.ps1
 
 # 3. Start local server at http://localhost:8000
@@ -105,7 +106,7 @@ Switch between **Arrow keys** and **WASD** in **Settings**:
 
 ## Dev Notes
 
-If you edit any upstream C/Makefile files inside `pokeemerald-3d/`, save your changes back to `patches/pokeemerald-wasm.patch` before committing:
+If you edit any upstream C/Makefile files inside `pokeemerald-3d/` or `.build/kaizo-worktree/pokeemerald-3d/`, save your changes back to `patches/pokeemerald-wasm.patch` and `patches/emerald-kaizo-wasm.patch` before committing:
 ```powershell
 node tools/save-upstream-patch.mjs
 ```

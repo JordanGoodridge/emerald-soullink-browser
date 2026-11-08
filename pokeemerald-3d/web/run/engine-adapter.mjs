@@ -8,18 +8,23 @@ export const RUN_KIND_ELITE = 3;
 export const RUN_KIND_CHAMPION = 4;
 export const RUN_KIND_STARTER = 5;
 
-function randomizationMode(kind, options) {
+function randomizationMode(kind, options, adapter = null) {
+  const caps = adapter?.capabilities?.randomizer;
   if (kind === RUN_KIND_WILD) {
+    if (caps?.wild === false) return 'off';
     if (options.powerBalanceWild === true) return 'power_balance';
     return options.randomizeWild === true ? 'random' : 'off';
   }
   if (kind === RUN_KIND_STARTER) {
+    if (caps?.starters === false) return 'off';
     return options.randomizeStarters === true ? 'random' : 'off';
   }
   if ([RUN_KIND_GYM, RUN_KIND_ELITE, RUN_KIND_CHAMPION].includes(kind)) {
+    if (caps?.gyms === false) return 'off';
     if (options.powerBalanceGyms === true) return 'power_balance';
     return options.randomizeGyms === true ? 'random' : 'off';
   }
+  if (caps?.trainers === false) return 'off';
   if (options.powerBalanceTrainers === true) return 'power_balance';
   return options.randomizeTrainers === true ? 'random' : 'off';
 }
@@ -96,7 +101,7 @@ export function createRunEngineHooks({
       const chooseSpecies = randomizer();
       const runOptions = currentOptions();
       if (!isEnabled() || !chooseSpecies) return originalSpecies;
-      const mode = randomizationMode(kind, runOptions);
+      const mode = randomizationMode(kind, runOptions, adapter);
       if (mode === 'off') return originalSpecies;
       const kindName = kind === RUN_KIND_WILD ? 'wild'
         : kind === RUN_KIND_STARTER ? 'starter'

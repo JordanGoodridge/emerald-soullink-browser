@@ -111,7 +111,7 @@ export function createOverworldPeerDom({
         .map((actor) => ({
           playerId: actor.playerId,
           x: actor.screenX,
-          y: actor.screenY - 32,
+          y: actor.screenY - 23,
           marker: actor.marker,
         }));
 

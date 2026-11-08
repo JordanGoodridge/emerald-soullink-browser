@@ -10,7 +10,17 @@ const OLD_UNOWN_SPECIES_LAST = 276;
 export const EMERALD_MAX_MONEY = 999_999;
 export const SAVE_BLOCK1_MONEY_OFFSET = 0x490;
 
-export function createEmeraldRunAdapter({ regionMap = null, trainerIdFromMemory = null } = {}) {
+export function createEmeraldRunAdapter({
+  id = 'emerald',
+  regionMap = null,
+  trainerIdFromMemory = null,
+  randomizer = { wild: true, trainers: true, gyms: true, starters: true },
+  precedence = { gameOwns: [], pokeTechAdds: [], conflicts: [] },
+} = {}) {
+  const sectionPrefix = `${id}:section:`;
+  const mapPrefix = `${id}:map:`;
+  const giftPrefix = `${id}:gift:`;
+
   function sectionId(sample = {}, exports = null) {
     if (Number.isInteger(sample.sectionId) && sample.sectionId >= 0) return sample.sectionId;
     const exported = exports?.WasmRunMapSection?.();
@@ -18,21 +28,21 @@ export function createEmeraldRunAdapter({ regionMap = null, trainerIdFromMemory 
   }
 
   function areaKey(sample = {}, { exports = null, giftId = null, separateMethods = false } = {}) {
-    if (giftId !== null && giftId !== undefined) return `emerald:gift:${String(giftId)}`;
+    if (giftId !== null && giftId !== undefined) return `${giftPrefix}${String(giftId)}`;
     const section = sectionId(sample, exports);
     if (section !== null) {
       const method = separateMethods && sample.encounterMethod ? `:${sample.encounterMethod}` : '';
-      return `${SECTION_PREFIX}${section}${method}`;
+      return `${sectionPrefix}${section}${method}`;
     }
     const world = sample.world ?? sample;
     if (Number.isInteger(world.mapGroup) && Number.isInteger(world.mapNum)) {
-      return `${MAP_PREFIX}${world.mapGroup}:${world.mapNum}`;
+      return `${mapPrefix}${world.mapGroup}:${world.mapNum}`;
     }
     return null;
   }
 
   function areaLabel(key, sample = {}, exports = null) {
-    if (key?.startsWith('emerald:gift:')) return `Gift: ${key.slice('emerald:gift:'.length)}`;
+    if (key?.startsWith(giftPrefix)) return `Gift: ${key.slice(giftPrefix.length)}`;
     const section = sectionId(sample, exports);
     const entry = regionMap?.sections?.find((candidate) => candidate.id === section);
     if (entry?.name) return entry.name;
@@ -70,7 +80,7 @@ export function createEmeraldRunAdapter({ regionMap = null, trainerIdFromMemory 
   }
 
   return {
-    id: 'emerald',
+    id,
     modes: ['nuzlocke', 'soullink'],
     areaKey,
     areaLabel,
@@ -138,6 +148,9 @@ export function createEmeraldRunAdapter({ regionMap = null, trainerIdFromMemory 
       if (typeof exports.SetUnlockedPokedexFlags === 'function') {
         exports.SetUnlockedPokedexFlags();
       }
+      if (typeof exports.EnableNationalPokedex === 'function') {
+        exports.EnableNationalPokedex();
+      }
       if (typeof exports.VarSet === 'function') {
         const starterIndex = starterSpecies === 277 ? 0 : starterSpecies === 280 ? 1 : starterSpecies === 283 ? 2 : starterSpecies % 3;
         exports.VarSet(0x4023, starterIndex); // VAR_STARTER_MON
@@ -185,9 +198,18 @@ export function createEmeraldRunAdapter({ regionMap = null, trainerIdFromMemory 
       linkedPcBoxing: 'enforce',
       quickStart: 'table',
       tracker: regionMap ? 'map-data' : 'none',
-      randomizer: Object.freeze({ wild: true, trainers: true, gyms: true, starters: true }),
+      randomizer: Object.freeze({
+        wild: Boolean(randomizer?.wild),
+        trainers: Boolean(randomizer?.trainers),
+        gyms: Boolean(randomizer?.gyms),
+        starters: Boolean(randomizer?.starters),
+      }),
     }),
-    precedence: Object.freeze({ gameOwns: [], pokeTechAdds: [], conflicts: [] }),
+    precedence: Object.freeze({
+      gameOwns: Object.freeze([...(precedence?.gameOwns ?? [])]),
+      pokeTechAdds: Object.freeze([...(precedence?.pokeTechAdds ?? [])]),
+      conflicts: Object.freeze([...(precedence?.conflicts ?? [])]),
+    }),
   };
 }
 

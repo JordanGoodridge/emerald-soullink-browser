@@ -409,10 +409,13 @@ export class billboardBuilderMethods {
       // Expose the projected head/foot geometry for every visible peer so the
       // shell can anchor name tags and battle badges in the same screen space
       // the billboard is drawn in, rather than the flat field-pixel offset.
+      // Avatar cells are 16x32 with 10 transparent rows at the top (visible
+      // height 22px), so anchor just above the visible hair rather than y0.
+      const visibleHeadOffset = 23 * projected.scale;
       projectedActors.push({
         playerId: actor.playerId,
         x: (x0 + x1) / 2,
-        y: y0,
+        y: projected.y - visibleHeadOffset,
         footY: projected.y,
         marker: actor.marker ?? null,
       });

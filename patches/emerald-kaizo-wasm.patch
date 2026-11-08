@@ -1,0 +1,4340 @@
+diff --git a/Makefile b/Makefile
+index a0111fbf..7b7873f1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,266 +1,149 @@
+-# GBA rom header
+-TITLE       := POKEMON EMER
+-GAME_CODE   := BPEE
+-MAKER_CODE  := 01
+-REVISION    := 0
+-MODERN      ?= 0
+-KEEP_TEMPS  ?= 0
+-
+-# `File name`.gba ('_modern' will be appended to the modern builds)
+-FILE_NAME := pokeemeraldkaizo
++FILE_NAME := pokeemerald
+ BUILD_DIR := build
+ 
+-# Builds the ROM using a modern compiler
+-MODERN      ?= 0
+-# Compares the ROM to a checksum of the original - only makes sense using when non-modern
+-COMPARE     ?= 0
++WASM_CC ?= $(shell { command -v /opt/homebrew/opt/llvm/bin/clang || command -v /usr/local/opt/llvm/bin/clang || command -v clang; })
++WASM_LD ?= $(shell { command -v wasm-ld || find "$$HOME/.rustup/toolchains" -path '*/gcc-ld/wasm-ld' -type f 2>/dev/null | head -n1; })
++WASM_OPT_FLAGS ?= -O2
++WASM_LDFLAGS ?=
+ 
+-ifeq (modern,$(MAKECMDGOALS))
+-  MODERN := 1
+-endif
+-ifeq (compare,$(MAKECMDGOALS))
+-  COMPARE := 1
+-endif
+-
+-# Default make rule
+-all: rom
+-
+-# Toolchain selection
+-TOOLCHAIN := $(DEVKITARM)
+-# don't use dkP's base_tools anymore
+-# because the redefinition of $(CC) conflicts
+-# with when we want to use $(CC) to preprocess files
+-# thus, manually create the variables for the bin
+-# files, or use arm-none-eabi binaries on the system
+-# if dkP is not installed on this system
+-ifneq (,$(TOOLCHAIN))
+-  ifneq ($(wildcard $(TOOLCHAIN)/bin),)
+-    export PATH := $(TOOLCHAIN)/bin:$(PATH)
+-  endif
+-endif
+-
+-PREFIX := arm-none-eabi-
+-OBJCOPY := $(PREFIX)objcopy
+-OBJDUMP := $(PREFIX)objdump
+-AS := $(PREFIX)as
+-LD := $(PREFIX)ld
+-
+-EXE :=
+-ifeq ($(OS),Windows_NT)
+-  EXE := .exe
+-endif
+-
+-# use arm-none-eabi-cpp for macOS
+-# as macOS's default compiler is clang
+-# and clang's preprocessor will warn on \u
+-# when preprocessing asm files, expecting a unicode literal
+-# we can't unconditionally use arm-none-eabi-cpp
+-# as installations which install binutils-arm-none-eabi
+-# don't come with it
+-ifneq ($(MODERN),1)
+-  ifeq ($(shell uname -s),Darwin)
+-    CPP := $(PREFIX)cpp
+-  else
+-    CPP := $(CC) -E
+-  endif
+-else
+-  CPP := $(PREFIX)cpp
+-endif
+-
+-ROM_NAME := $(FILE_NAME).gba
+-OBJ_DIR_NAME := $(BUILD_DIR)/emerald
+-MODERN_ROM_NAME := $(FILE_NAME)_modern.gba
+-MODERN_OBJ_DIR_NAME := $(BUILD_DIR)/modern
++WASM_BUILD_DIR := $(BUILD_DIR)/wasm
++WASM_OBJ_DIR := $(WASM_BUILD_DIR)/obj
++WASM := $(WASM_BUILD_DIR)/$(FILE_NAME).wasm
++WASM_SOUND_HEADER := $(WASM_BUILD_DIR)/wasm_sound.h
+ ASSETS_DIR_NAME := $(BUILD_DIR)/assets
+ 
+-ELF_NAME := $(ROM_NAME:.gba=.elf)
+-MAP_NAME := $(ROM_NAME:.gba=.map)
+-MODERN_ELF_NAME := $(MODERN_ROM_NAME:.gba=.elf)
+-MODERN_MAP_NAME := $(MODERN_ROM_NAME:.gba=.map)
+-
+-# Pick our active variables
+-ifeq ($(MODERN),0)
+-  ROM := $(ROM_NAME)
+-  OBJ_DIR := $(OBJ_DIR_NAME)
+-else
+-  ROM := $(MODERN_ROM_NAME)
+-  OBJ_DIR := $(MODERN_OBJ_DIR_NAME)
+-endif
+-ELF := $(ROM:.gba=.elf)
+-MAP := $(ROM:.gba=.map)
+-SYM := $(ROM:.gba=.sym)
+-
+-# Commonly used directories
+-C_SUBDIR = src
+-ASM_SUBDIR = asm
+-DATA_SRC_SUBDIR = src/data
+-DATA_ASM_SUBDIR = data
+-MID_SUBDIR = sound/songs/midi
+-
+-C_BUILDDIR = $(OBJ_DIR)/$(C_SUBDIR)
+-ASM_BUILDDIR = $(OBJ_DIR)/$(ASM_SUBDIR)
+-DATA_ASM_BUILDDIR = $(OBJ_DIR)/$(DATA_ASM_SUBDIR)
+-MID_BUILDDIR = $(OBJ_DIR)/$(MID_SUBDIR)
++C_SUBDIR := src
++DATA_SRC_SUBDIR := src/data
++DATA_ASM_SUBDIR := data
++MID_SUBDIR := sound/songs/midi
+ 
+ SHELL := bash -o pipefail
+ 
+-# Set flags for tools
+-ASFLAGS := -mcpu=arm7tdmi --defsym MODERN=$(MODERN)
+-
+-INCLUDE_DIRS := include
+-INCLUDE_CPP_ARGS := $(INCLUDE_DIRS:%=-iquote %)
+-INCLUDE_SCANINC_ARGS := $(INCLUDE_DIRS:%=-I %)
+-
+-O_LEVEL ?= 2
+-CPPFLAGS := $(INCLUDE_CPP_ARGS) -Wno-trigraphs -DMODERN=$(MODERN)
+-ifeq ($(MODERN),0)
+-  CPPFLAGS += -I tools/agbcc/include -I tools/agbcc -nostdinc -undef -std=gnu89
+-  CC1 := tools/agbcc/bin/agbcc$(EXE)
+-  override CFLAGS += -mthumb-interwork -Wimplicit -Wparentheses -Werror -O$(O_LEVEL) -fhex-asm -g
+-  LIBPATH := -L ../../tools/agbcc/lib
+-  LIB := $(LIBPATH) -lgcc -lc -L../../libagbsyscall -lagbsyscall
+-else
+-  # Note: The makefile must be set up to not call these if modern == 0
+-  MODERNCC := $(PREFIX)gcc
+-  PATH_MODERNCC := PATH="$(PATH)" $(MODERNCC)
+-  CC1 := $(shell $(PATH_MODERNCC) --print-prog-name=cc1) -quiet
+-  override CFLAGS += -mthumb -mthumb-interwork -O$(O_LEVEL) -mabi=apcs-gnu -mtune=arm7tdmi -march=armv4t -fno-toplevel-reorder -Wno-pointer-to-int-cast
+-  LIBPATH := -L "$(dir $(shell $(PATH_MODERNCC) -mthumb -print-file-name=libgcc.a))" -L "$(dir $(shell $(PATH_MODERNCC) -mthumb -print-file-name=libnosys.a))" -L "$(dir $(shell $(PATH_MODERNCC) -mthumb -print-file-name=libc.a))"
+-  LIB := $(LIBPATH) -lc -lnosys -lgcc -L../../libagbsyscall -lagbsyscall
++ifeq ($(OS),Windows_NT)
++  # Windows Python defaults to cp1252, but the game's data files are UTF-8.
++  export PYTHONUTF8 := 1
++  export PYTHONIOENCODING := utf-8
+ endif
+-# Enable debug info if set
+-ifeq ($(DINFO),1)
+-  override CFLAGS += -g
++
++EXE :=
++ifeq ($(OS),Windows_NT)
++  EXE := .exe
+ endif
+ 
+-# Variable filled out in other make files
+ AUTO_GEN_TARGETS :=
+ include make_tools.mk
+-# Tool executables
+-GFX       := $(TOOLS_DIR)/gbagfx/gbagfx$(EXE)
+-WAV2AGB   := $(TOOLS_DIR)/wav2agb/wav2agb$(EXE)
+-MID       := $(TOOLS_DIR)/mid2agb/mid2agb$(EXE)
+-SCANINC   := $(TOOLS_DIR)/scaninc/scaninc$(EXE)
+-PREPROC   := $(TOOLS_DIR)/preproc/preproc$(EXE)
+-RAMSCRGEN := $(TOOLS_DIR)/ramscrgen/ramscrgen$(EXE)
+-FIX       := $(TOOLS_DIR)/gbafix/gbafix$(EXE)
+-MAPJSON   := $(TOOLS_DIR)/mapjson/mapjson$(EXE)
+-JSONPROC  := $(TOOLS_DIR)/jsonproc/jsonproc$(EXE)
+-
+-PERL := perl
+-SHA1 := $(shell { command -v sha1sum || command -v shasum; } 2>/dev/null) -c
++
++GFX      := $(TOOLS_DIR)/gbagfx/gbagfx$(EXE)
++WAV2AGB  := $(TOOLS_DIR)/wav2agb/wav2agb$(EXE)
++MID      := $(TOOLS_DIR)/mid2agb/mid2agb$(EXE)
++PREPROC  := $(TOOLS_DIR)/preproc/preproc$(EXE)
++MAPJSON  := $(TOOLS_DIR)/mapjson/mapjson$(EXE)
++JSONPROC := $(TOOLS_DIR)/jsonproc/jsonproc$(EXE)
+ 
+ MAKEFLAGS += --no-print-directory
++Q := $(if $(V),,@)
+ 
+-# Clear the default suffixes
+ .SUFFIXES:
+-# Don't delete intermediate files
+ .SECONDARY:
+-# Delete files that weren't built properly
+ .DELETE_ON_ERROR:
++.DEFAULT_GOAL := wasm
+ 
+-RULES_NO_SCAN += libagbsyscall clean clean-assets tidy tidymodern tidynonmodern generated clean-generated
+-.PHONY: all rom modern compare
+-.PHONY: $(RULES_NO_SCAN)
+-
+-infoshell = $(foreach line, $(shell $1 | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
++RULES_NO_SETUP := clean clean-assets clean-generated clean-tools clean-wasm tools check-tools
++.PHONY: wasm wasm-assets clean clean-assets clean-generated clean-wasm serve-wasm wrangler-site generated
+ 
+-# Check if we need to scan dependencies based on the chosen rule OR user preference
+-NODEP ?= 0
+-# Check if we need to pre-build tools and generate assets based on the chosen rule.
+ SETUP_PREREQS ?= 1
+-# Disable dependency scanning for rules that don't need it.
+ ifneq (,$(MAKECMDGOALS))
+-  ifeq (,$(filter-out $(RULES_NO_SCAN),$(MAKECMDGOALS)))
+-    NODEP := 1
++  ifeq (,$(filter-out $(RULES_NO_SETUP),$(MAKECMDGOALS)))
+     SETUP_PREREQS := 0
+   endif
+ endif
+ 
+ .SHELLSTATUS ?= 0
+-
+ ifeq ($(SETUP_PREREQS),1)
+-  # If set on: Default target or a rule requiring a scan
+-  # Forcibly execute `make tools` since we need them for what we are doing.
+   $(foreach line, $(shell $(MAKE) -f make_tools.mk | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
+   ifneq ($(.SHELLSTATUS),0)
+     $(error Errors occurred while building tools. See error messages above for more details)
+   endif
+-  # Oh and also generate mapjson sources before we use `SCANINC`.
+-  $(foreach line, $(shell $(MAKE) generated | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
++  $(foreach line, $(shell $(MAKE) SETUP_PREREQS=0 generated | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
+   ifneq ($(.SHELLSTATUS),0)
+     $(error Errors occurred while generating map-related sources. See error messages above for more details)
+   endif
+ endif
+ 
+-# Collect sources
+ C_SRCS_IN := $(wildcard $(C_SUBDIR)/*.c $(C_SUBDIR)/*/*.c $(C_SUBDIR)/*/*/*.c)
+ C_SRCS := $(foreach src,$(C_SRCS_IN),$(if $(findstring .inc.c,$(src)),,$(src)))
+-C_OBJS := $(patsubst $(C_SUBDIR)/%.c,$(C_BUILDDIR)/%.o,$(C_SRCS))
+-
+-C_ASM_SRCS := $(wildcard $(C_SUBDIR)/*.s $(C_SUBDIR)/*/*.s $(C_SUBDIR)/*/*/*.s)
+-C_ASM_OBJS := $(patsubst $(C_SUBDIR)/%.s,$(C_BUILDDIR)/%.o,$(C_ASM_SRCS))
+-
+-ASM_SRCS := $(wildcard $(ASM_SUBDIR)/*.s)
+-ASM_OBJS := $(patsubst $(ASM_SUBDIR)/%.s,$(ASM_BUILDDIR)/%.o,$(ASM_SRCS))
+-
+-DATA_ASM_SRCS := $(wildcard $(DATA_ASM_SUBDIR)/*.s)
+-DATA_ASM_OBJS := $(patsubst $(DATA_ASM_SUBDIR)/%.s,$(DATA_ASM_BUILDDIR)/%.o,$(DATA_ASM_SRCS))
+-
++WASM_C_OBJS := $(patsubst $(C_SUBDIR)/%.c,$(WASM_OBJ_DIR)/%.o,$(C_SRCS))
++WASM_DATA_ASM_SRCS := \
++	$(DATA_ASM_SUBDIR)/maps.s \
++	$(DATA_ASM_SUBDIR)/map_events.s \
++	$(DATA_ASM_SUBDIR)/event_scripts.s \
++	$(DATA_ASM_SUBDIR)/battle_scripts_1.s \
++	$(DATA_ASM_SUBDIR)/battle_scripts_2.s \
++	$(DATA_ASM_SUBDIR)/battle_ai_scripts.s \
++	$(DATA_ASM_SUBDIR)/battle_anim_scripts.s \
++	$(DATA_ASM_SUBDIR)/sound_data.s
++WASM_DATA_OBJS := $(patsubst $(DATA_ASM_SUBDIR)/%.s,$(WASM_OBJ_DIR)/%.o,$(WASM_DATA_ASM_SRCS))
+ MID_SRCS := $(wildcard $(MID_SUBDIR)/*.mid)
+-MID_OBJS := $(patsubst $(MID_SUBDIR)/%.mid,$(MID_BUILDDIR)/%.o,$(MID_SRCS))
++MID_ASM_SRCS := $(patsubst $(MID_SUBDIR)/%.mid,$(MID_SUBDIR)/%.s,$(MID_SRCS))
++DIRECT_SOUND_WAVS := $(wildcard sound/direct_sound_samples/*.wav sound/direct_sound_samples/phonemes/*.wav)
++DIRECT_SOUND_BINS := $(patsubst %.wav,%.bin,$(DIRECT_SOUND_WAVS))
++CRY_WAVS := $(wildcard sound/direct_sound_samples/cries/*.wav)
++CRY_BINS := $(patsubst %.wav,%.bin,$(CRY_WAVS))
+ 
+-OBJS     := $(C_OBJS) $(C_ASM_OBJS) $(ASM_OBJS) $(DATA_ASM_OBJS) $(MID_OBJS)
+-OBJS_REL := $(patsubst $(OBJ_DIR)/%,%,$(OBJS))
++wasm: generated wasm-assets $(WASM)
+ 
+-SUBDIRS  := $(sort $(dir $(OBJS)))
+-$(shell mkdir -p $(SUBDIRS))
++wasm-assets: $(GFX)
++	$(Q)uv run python tools/generate_wasm_assets.py
+ 
+-# Pretend rules that are actually flags defer to `make all`
+-modern: all
+-compare: all
++$(WASM_SOUND_HEADER): tools/generate_wasm_sound.py sound/song_table.inc sound/songs/midi/midi.cfg $(MID_SRCS)
++	@mkdir -p $(dir $@)
++	uv run python tools/generate_wasm_sound.py $@
+ 
+-# Other rules
+-rom: $(ROM)
+-ifeq ($(COMPARE),1)
+-	@$(SHA1) rom.sha1
+-endif
++$(WASM_C_OBJS): | generated wasm-assets
+ 
+-syms: $(SYM)
++$(WASM): Makefile $(WASM_C_OBJS) $(WASM_DATA_OBJS)
++	@test -n "$(WASM_LD)" || { echo "wasm-ld not found; set WASM_LD=/path/to/wasm-ld"; exit 1; }
++	@echo "  LD      $@"
++	$(Q)$(WASM_LD) $(WASM_LDFLAGS) --no-entry --allow-undefined --initial-memory=268435456 --max-memory=268435456 --export=AgbMain --export=WasmRunFrame --export-all -o $@ $(filter %.o,$^)
+ 
+-clean: tidy clean-tools clean-generated clean-assets
+-	@$(MAKE) clean -C libagbsyscall
++$(WASM_OBJ_DIR)/sprite.o: Makefile
++$(WASM_OBJ_DIR)/sprite.o: WASM_OPT_FLAGS := -O3
++$(WASM_OBJ_DIR)/task.o: Makefile
++$(WASM_OBJ_DIR)/task.o: WASM_OPT_FLAGS := -O3
++$(WASM_OBJ_DIR)/tileset_anims.o: Makefile
++$(WASM_OBJ_DIR)/tileset_anims.o: WASM_OPT_FLAGS := -O3
+ 
+-clean-assets:
+-	rm -rf $(ASSETS_DIR_NAME)
+-	rm -f $(MID_SUBDIR)/*.s
+-	rm -f $(DATA_ASM_SUBDIR)/layouts/layouts.inc $(DATA_ASM_SUBDIR)/layouts/layouts_table.inc
+-	rm -f $(DATA_ASM_SUBDIR)/maps/connections.inc $(DATA_ASM_SUBDIR)/maps/events.inc $(DATA_ASM_SUBDIR)/maps/groups.inc $(DATA_ASM_SUBDIR)/maps/headers.inc
+-	find sound -iname '*.bin' -exec rm {} +
+-	find . \( -iname '*.1bpp' -o -iname '*.4bpp' -o -iname '*.8bpp' -o -iname '*.gbapal' -o -iname '*.lz' -o -iname '*.rl' -o -iname '*.latfont' -o -iname '*.hwjpnfont' -o -iname '*.fwjpnfont' \) -exec rm {} +
+-	find $(DATA_ASM_SUBDIR)/maps \( -iname 'connections.inc' -o -iname 'events.inc' -o -iname 'header.inc' \) -exec rm {} +
++$(WASM_OBJ_DIR)/wasm_display.o: Makefile
++$(WASM_OBJ_DIR)/wasm_display.o: WASM_OPT_FLAGS := -O3
++
++$(WASM_OBJ_DIR)/%.o: $(C_SUBDIR)/%.c
++	@mkdir -p $(dir $@)
++	@echo "  CC      $<"
++	$(Q)$(WASM_CC) --target=wasm32-unknown-unknown -DMODERN=1 -DWASM=1 -I $(WASM_BUILD_DIR) -I include/wasm -I include -iquote include -E $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(WASM_CC) --target=wasm32-unknown-unknown -x c $(WASM_OPT_FLAGS) -Wno-incompatible-library-redeclaration -Wno-unknown-attributes -Wno-ignored-attributes -Wno-parentheses -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-builtin-requires-header -Wno-gnu-alignof-expression -Wno-unknown-escape-sequence -Wno-excess-initializers -c - -o $@
+ 
+-tidy: tidynonmodern tidymodern
++$(WASM_OBJ_DIR)/%.o: $(DATA_ASM_SUBDIR)/%.s tools/wasm_asm_data.py | generated
++	@mkdir -p $(dir $@) $(WASM_BUILD_DIR)
++	@echo "  AS      $<"
++	$(Q)uv run python tools/wasm_asm_data.py $< $(WASM_BUILD_DIR)/$*.wasm.s
++	$(Q)$(WASM_CC) --target=wasm32-unknown-unknown -c $(WASM_BUILD_DIR)/$*.wasm.s -o $@
+ 
+-tidynonmodern:
+-	rm -f $(ROM_NAME) $(ELF_NAME) $(MAP_NAME)
+-	rm -rf $(OBJ_DIR_NAME)
++serve-wasm: wasm
++	node web/server.mjs
+ 
+-tidymodern:
+-	rm -f $(MODERN_ROM_NAME) $(MODERN_ELF_NAME) $(MODERN_MAP_NAME)
+-	rm -rf $(MODERN_OBJ_DIR_NAME)
++wrangler-site: wasm
++	node tools/build_wrangler_site.mjs
+ 
+-# Other rules
+ include graphics_file_rules.mk
+ include map_data_rules.mk
+ include json_data_rules.mk
+ include audio_rules.mk
+ 
+-# NOTE: Tools must have been built prior (FIXME)
+-# so you can't really call this rule directly
+-generated: $(AUTO_GEN_TARGETS)
+-	@: # Silence the "Nothing to be done for `generated'" message, which some people were confusing for an error.
++$(WASM_OBJ_DIR)/maps.o: $(DATA_ASM_SUBDIR)/maps.s $(LAYOUTS_DIR)/layouts.inc $(LAYOUTS_DIR)/layouts_table.inc $(MAPS_DIR)/headers.inc $(MAPS_DIR)/groups.inc $(MAPS_DIR)/connections.inc $(MAP_CONNECTIONS) $(MAP_HEADERS)
++$(WASM_OBJ_DIR)/map_events.o: $(DATA_ASM_SUBDIR)/map_events.s $(MAPS_DIR)/events.inc $(MAP_EVENTS)
++$(WASM_OBJ_DIR)/sound_data.o: $(DATA_ASM_SUBDIR)/sound_data.s $(DIRECT_SOUND_BINS) $(CRY_BINS) $(MID_ASM_SRCS)
+ 
++generated: $(AUTO_GEN_TARGETS)
++	@: # Silence the "Nothing to be done" message.
+ 
+ %.s:   ;
+ %.png: ;
+@@ -275,115 +158,27 @@ generated: $(AUTO_GEN_TARGETS)
+ %.lz:     %      ; $(GFX) $< $@
+ %.rl:     %      ; $(GFX) $< $@
+ 
+-clean-generated:
+-	@rm -f $(AUTO_GEN_TARGETS)
+-	@echo "rm -f <AUTO_GEN_TARGETS>"
+-
+-ifeq ($(MODERN),0)
+-$(C_BUILDDIR)/libc.o: CC1 := $(TOOLS_DIR)/agbcc/bin/old_agbcc$(EXE)
+-$(C_BUILDDIR)/libc.o: CFLAGS := -O2
+-$(C_BUILDDIR)/siirtc.o: CFLAGS := -mthumb-interwork
+-$(C_BUILDDIR)/agb_flash.o: CFLAGS := -O -mthumb-interwork
+-$(C_BUILDDIR)/agb_flash_1m.o: CFLAGS := -O -mthumb-interwork
+-$(C_BUILDDIR)/agb_flash_mx.o: CFLAGS := -O -mthumb-interwork
+-$(C_BUILDDIR)/m4a.o: CC1 := tools/agbcc/bin/old_agbcc$(EXE)
+-$(C_BUILDDIR)/record_mixing.o: CFLAGS += -ffreestanding
+-$(C_BUILDDIR)/librfu_intr.o: CC1 := $(TOOLS_DIR)/agbcc/bin/agbcc_arm$(EXE)
+-$(C_BUILDDIR)/librfu_intr.o: CFLAGS := -O2 -mthumb-interwork -quiet
+-else
+-$(C_BUILDDIR)/librfu_intr.o: CFLAGS := -mthumb-interwork -O2 -mabi=apcs-gnu -mtune=arm7tdmi -march=armv4t -fno-toplevel-reorder -Wno-pointer-to-int-cast
+-$(C_BUILDDIR)/berry_crush.o: override CFLAGS += -Wno-address-of-packed-member
+-endif
+-
+-# Dependency rules (for the *.c & *.s sources to .o files)
+-# Have to be explicit or else missing files won't be reported.
+-
+-# As a side effect, they're evaluated immediately instead of when the rule is invoked.
+-# It doesn't look like $(shell) can be deferred so there might not be a better way (Icedude_907: there is soon).
+-
+-$(C_BUILDDIR)/%.o: $(C_SUBDIR)/%.c
+-ifneq ($(KEEP_TEMPS),1)
+-	@echo "$(CC1) <flags> -o $@ $<"
+-	@$(CPP) $(CPPFLAGS) $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(CC1) $(CFLAGS) -o - - | cat - <(echo -e ".text\n\t.align\t2, 0") | $(AS) $(ASFLAGS) -o $@ -
+-else
+-	@$(CPP) $(CPPFLAGS) $< -o $(C_BUILDDIR)/$*.i
+-	@$(PREPROC) -g $(ASSETS_DIR_NAME) $(C_BUILDDIR)/$*.i charmap.txt | $(CC1) $(CFLAGS) -o $(C_BUILDDIR)/$*.s
+-	@echo -e ".text\n\t.align\t2, 0\n" >> $(C_BUILDDIR)/$*.s
+-	$(AS) $(ASFLAGS) -o $@ $(C_BUILDDIR)/$*.s
+-endif
+-
+-$(C_BUILDDIR)/%.d: $(C_SUBDIR)/%.c
+-	$(SCANINC) -M $@ -g $(ASSETS_DIR_NAME) $(INCLUDE_SCANINC_ARGS) -I tools/agbcc/include $<
+-
+-ifneq ($(NODEP),1)
+--include $(addprefix $(OBJ_DIR)/,$(C_SRCS:.c=.d))
+-endif
++$(ASSETS_DIR_NAME)/%.png.1bpp: %.png  ; @mkdir -p $(dir $@); $(GFX) $< $@
++$(ASSETS_DIR_NAME)/%.png.4bpp: %.png  ; @mkdir -p $(dir $@); $(GFX) $< $@
++$(ASSETS_DIR_NAME)/%.png.8bpp: %.png  ; @mkdir -p $(dir $@); $(GFX) $< $@
++$(ASSETS_DIR_NAME)/%.png.gbapal: %.png; @mkdir -p $(dir $@); $(GFX) $< $@
++$(ASSETS_DIR_NAME)/%.pal.gbapal: %.pal; @mkdir -p $(dir $@); $(GFX) $< $@
++$(ASSETS_DIR_NAME)/%: %               ; @mkdir -p $(dir $@); cp $< $@
+ 
+-$(ASM_BUILDDIR)/%.o: $(ASM_SUBDIR)/%.s
+-	$(AS) $(ASFLAGS) -o $@ $<
++clean: clean-wasm clean-generated clean-assets clean-tools
+ 
+-$(ASM_BUILDDIR)/%.d: $(ASM_SUBDIR)/%.s
+-	$(SCANINC) -M $@ -g $(ASSETS_DIR_NAME) $(INCLUDE_SCANINC_ARGS) -I "" $<
+-
+-ifneq ($(NODEP),1)
+--include $(addprefix $(OBJ_DIR)/,$(ASM_SRCS:.s=.d))
+-endif
+-
+-$(C_BUILDDIR)/%.o: $(C_SUBDIR)/%.s
+-	$(PREPROC) $< charmap.txt | $(CPP) $(INCLUDE_SCANINC_ARGS) - | $(PREPROC) -ie $< charmap.txt | $(AS) $(ASFLAGS) -o $@
+-
+-$(C_BUILDDIR)/%.d: $(C_SUBDIR)/%.s
+-	$(SCANINC) -M $@ -g $(ASSETS_DIR_NAME) $(INCLUDE_SCANINC_ARGS) -I "" $<
+-
+-ifneq ($(NODEP),1)
+--include $(addprefix $(OBJ_DIR)/,$(C_ASM_SRCS:.s=.d))
+-endif
+-
+-$(DATA_ASM_BUILDDIR)/%.o: $(DATA_ASM_SUBDIR)/%.s
+-	$(PREPROC) $< charmap.txt | $(CPP) $(INCLUDE_SCANINC_ARGS) - | $(PREPROC) -ie $< charmap.txt | $(AS) $(ASFLAGS) -o $@
+-
+-$(DATA_ASM_BUILDDIR)/%.d: $(DATA_ASM_SUBDIR)/%.s
+-	$(SCANINC) -M $@ -g $(ASSETS_DIR_NAME) $(INCLUDE_SCANINC_ARGS) -I "" $<
+-
+-ifneq ($(NODEP),1)
+--include $(addprefix $(OBJ_DIR)/,$(DATA_ASM_SRCS:.s=.d))
+-endif
++clean-wasm:
++	rm -rf $(WASM_BUILD_DIR)
+ 
+-$(OBJ_DIR)/sym_bss.ld: sym_bss.txt
+-	$(RAMSCRGEN) .bss $< ENGLISH > $@
+-
+-$(OBJ_DIR)/sym_common.ld: sym_common.txt $(C_OBJS) $(wildcard common_syms/*.txt)
+-	$(RAMSCRGEN) COMMON $< ENGLISH -c $(C_BUILDDIR),common_syms > $@
+-
+-$(OBJ_DIR)/sym_ewram.ld: sym_ewram.txt
+-	$(RAMSCRGEN) ewram_data $< ENGLISH > $@
+-
+-# Linker script
+-ifeq ($(MODERN),0)
+-LD_SCRIPT := ld_script.ld
+-LD_SCRIPT_DEPS := $(OBJ_DIR)/sym_bss.ld $(OBJ_DIR)/sym_common.ld $(OBJ_DIR)/sym_ewram.ld
+-else
+-LD_SCRIPT := ld_script_modern.ld
+-LD_SCRIPT_DEPS :=
+-endif
+-
+-# Final rules
+-
+-libagbsyscall:
+-	@$(MAKE) -C libagbsyscall TOOLCHAIN=$(TOOLCHAIN) MODERN=$(MODERN)
+-
+-# Elf from object files
+-LDFLAGS = -Map ../../$(MAP)
+-$(ELF): $(LD_SCRIPT) $(LD_SCRIPT_DEPS) $(OBJS) libagbsyscall
+-	@cd $(OBJ_DIR) && $(LD) $(LDFLAGS) -T ../../$< --print-memory-usage -o ../../$@ $(OBJS_REL) $(LIB) | cat
+-	@echo "cd $(OBJ_DIR) && $(LD) $(LDFLAGS) -T ../../$< --print-memory-usage -o ../../$@ <objs> <libs> | cat"
+-	$(FIX) $@ -t"$(TITLE)" -c$(GAME_CODE) -m$(MAKER_CODE) -r$(REVISION) --silent
+-
+-# Builds the rom from the elf file
+-$(ROM): $(ELF)
+-	$(OBJCOPY) -O binary $< $@
+-	$(FIX) $@ -p --silent
++clean-generated:
++	@rm -f $(AUTO_GEN_TARGETS)
++	@echo "rm -f <AUTO_GEN_TARGETS>"
+ 
+-# Symbol file (`make syms`)
+-$(SYM): $(ELF)
+-	$(OBJDUMP) -t $< | sort -u | grep -E "^0[2389]" | $(PERL) -p -e 's/^(\w{8}) (\w).{6} \S+\t(\w{8}) (\S+)$$/\1 \2 \3 \4/g' > $@
++clean-assets:
++	rm -rf $(ASSETS_DIR_NAME)
++	rm -f $(MID_SUBDIR)/*.s
++	rm -f $(DATA_ASM_SUBDIR)/layouts/layouts.inc $(DATA_ASM_SUBDIR)/layouts/layouts_table.inc
++	rm -f $(DATA_ASM_SUBDIR)/maps/connections.inc $(DATA_ASM_SUBDIR)/maps/events.inc $(DATA_ASM_SUBDIR)/maps/groups.inc $(DATA_ASM_SUBDIR)/maps/headers.inc
++	find sound -iname '*.bin' -exec rm {} +
++	find . \( -iname '*.1bpp' -o -iname '*.4bpp' -o -iname '*.8bpp' -o -iname '*.gbapal' -o -iname '*.lz' -o -iname '*.rl' -o -iname '*.latfont' -o -iname '*.hwjpnfont' -o -iname '*.fwjpnfont' \) -exec rm {} +
++	find $(DATA_ASM_SUBDIR)/maps \( -iname 'connections.inc' -o -iname 'events.inc' -o -iname 'header.inc' \) -exec rm {} +
+diff --git a/audio_rules.mk b/audio_rules.mk
+index dcf08b35..f0d4b166 100644
+--- a/audio_rules.mk
++++ b/audio_rules.mk
+@@ -10,12 +10,6 @@ SPECIAL_OUTDIRS := $(MID_ASM_DIR) $(CRY_BIN_DIR)
+ SPECIAL_OUTDIRS += $(SOUND_BIN_DIR) $(SOUND_BIN_DIR)/direct_sound_samples/phonemes $(SOUND_BIN_DIR)/direct_sound_samples/cries
+ $(shell mkdir -p $(SPECIAL_OUTDIRS) )
+ 
+-# Assembly song compilation
+-$(SONG_BUILDDIR)/%.o: $(SONG_SUBDIR)/%.s
+-	$(AS) $(ASFLAGS) -I sound -o $@ $<
+-$(MID_BUILDDIR)/%.o: $(MID_ASM_DIR)/%.s
+-	$(AS) $(ASFLAGS) -I sound -o $@ $<
+-
+ # Compressed cries
+ $(CRY_BIN_DIR)/%.bin: $(CRY_SUBDIR)/%.wav
+ # NOTE: If using ipatix's High Quality Audio Mixer, remove "--no-pad" below.
+diff --git a/data/battle_scripts_2.s b/data/battle_scripts_2.s
+index 954509cf..927e9fd0 100644
+--- a/data/battle_scripts_2.s
++++ b/data/battle_scripts_2.s
+@@ -110,6 +110,12 @@ BattleScript_TrainerBallBlock::
+ 	waitmessage B_WAIT_TIME_LONG
+ 	finishaction
+ 
++BattleScript_RunCaptureBlocked::
++	waitmessage B_WAIT_TIME_LONG
++	printstring STRINGID_RUNCAPTUREBLOCKED
++	waitmessage B_WAIT_TIME_LONG
++	finishaction
++
+ BattleScript_PlayerUsesItem::
+ 	moveendcase MOVEEND_MIRROR_MOVE
+ 	end
+diff --git a/include/battle_scripts.h b/include/battle_scripts.h
+index cf39de3c..7c9b4b95 100644
+--- a/include/battle_scripts.h
++++ b/include/battle_scripts.h
+@@ -218,6 +218,7 @@ extern const u8 BattleScript_SuccessBallThrow[];
+ extern const u8 BattleScript_WallyBallThrow[];
+ extern const u8 BattleScript_ShakeBallThrow[];
+ extern const u8 BattleScript_TrainerBallBlock[];
++extern const u8 BattleScript_RunCaptureBlocked[];
+ extern const u8 BattleScript_RunByUsingItem[];
+ extern const u8 BattleScript_ActionWatchesCarefully[];
+ extern const u8 BattleScript_ActionGetNear[];
+diff --git a/include/constants/battle_string_ids.h b/include/constants/battle_string_ids.h
+index b34cf6ce..29e53d45 100644
+--- a/include/constants/battle_string_ids.h
++++ b/include/constants/battle_string_ids.h
+@@ -258,6 +258,7 @@
+ #define STRINGID_WALLYUSEDITEM              258
+ #define STRINGID_TRAINERBLOCKEDBALL         259
+ #define STRINGID_DONTBEATHIEF               260
++#define STRINGID_RUNCAPTUREBLOCKED          381
+ #define STRINGID_ITDODGEDBALL               261
+ #define STRINGID_YOUMISSEDPKMN              262
+ #define STRINGID_PKMNBROKEFREE              263
+@@ -379,7 +380,7 @@
+ #define STRINGID_TRAINER1WINTEXT            379
+ #define STRINGID_TRAINER2WINTEXT            380
+ 
+-#define BATTLESTRINGS_COUNT                 381
++#define BATTLESTRINGS_COUNT                 382
+ 
+ // This is the string id that gBattleStringsTable starts with.
+ // String ids before this (e.g. STRINGID_INTROMSG) are not in the table,
+diff --git a/include/gba/macro.h b/include/gba/macro.h
+index 5239cd4c..776ceaf9 100644
+--- a/include/gba/macro.h
++++ b/include/gba/macro.h
+@@ -253,6 +253,38 @@
+     dmaRegs[5];                                                 \
+ }
+ 
++#if WASM
++static inline void WasmDmaFill16(u16 value, void *dest, u32 size)
++{
++    u16 *out = dest;
++    size /= sizeof(*out);
++    while (size--)
++        *out++ = value;
++}
++
++static inline void WasmDmaFill32(u32 value, void *dest, u32 size)
++{
++    u32 *out = dest;
++    size /= sizeof(*out);
++    while (size--)
++        *out++ = value;
++}
++
++#undef DmaFill16
++#undef DmaFill32
++#undef DmaClear16
++#undef DmaClear32
++#undef DmaCopy16
++#undef DmaCopy32
++
++#define DmaFill16(dmaNum, value, dest, size) WasmDmaFill16(value, (void *)(dest), size)
++#define DmaFill32(dmaNum, value, dest, size) WasmDmaFill32(value, (void *)(dest), size)
++#define DmaClear16(dmaNum, dest, size) WasmDmaFill16(0, (void *)(dest), size)
++#define DmaClear32(dmaNum, dest, size) WasmDmaFill32(0, (void *)(dest), size)
++#define DmaCopy16(dmaNum, src, dest, size) __builtin_memcpy((void *)(dest), src, size)
++#define DmaCopy32(dmaNum, src, dest, size) __builtin_memcpy((void *)(dest), src, size)
++#endif
++
+ #define IntrEnable(flags)                                       \
+ {                                                               \
+     u16 imeTemp;                                                \
+diff --git a/include/global.berry.h b/include/global.berry.h
+index 29f1cfe1..92c3c839 100644
+--- a/include/global.berry.h
++++ b/include/global.berry.h
+@@ -72,6 +72,9 @@ struct BerryTree
+     u8 watered2:1;
+     u8 watered3:1;
+     u8 watered4:1;
++#if WASM
++    u8 wasmPadding[2];
++#endif
+ };
+ 
+ #endif // GUARD_GLOBAL_BERRY_H
+diff --git a/include/global.h b/include/global.h
+index bdfc426f..6a52bb8a 100644
+--- a/include/global.h
++++ b/include/global.h
+@@ -18,6 +18,12 @@
+ #include "constants/trainer_hill.h"
+ 
+ // Prevent cross-jump optimization.
++#if WASM
++#define BLOCK_CROSS_JUMP
++#define asm_unified(x)
++#define NAKED
++#define asm(...)
++#else
+ #define BLOCK_CROSS_JUMP asm("");
+ 
+ // to help in decompiling
+@@ -27,9 +33,10 @@
+ #if MODERN
+ #define asm __asm__
+ #endif
++#endif
+ 
+ /// IDE support
+-#if defined(__APPLE__) || defined(__CYGWIN__) || defined(__INTELLISENSE__)
++#if !WASM && (defined(__APPLE__) || defined(__CYGWIN__) || defined(__INTELLISENSE__))
+ // We define these when using certain IDEs to fool preproc
+ #define _(x)        {x}
+ #define __(x)       {x}
+@@ -40,6 +47,9 @@
+ #define INCBIN_S8   INCBIN
+ #define INCBIN_S16  INCBIN
+ #define INCBIN_S32  INCBIN
++#define INCGFX_U8   INCBIN
++#define INCGFX_U16  INCBIN
++#define INCGFX_U32  INCBIN
+ #endif // IDE support
+ 
+ #define ARRAY_COUNT(array) (size_t)(sizeof(array) / sizeof((array)[0]))
+@@ -201,6 +211,9 @@ struct Time
+     /*0x02*/ s8 hours;
+     /*0x03*/ s8 minutes;
+     /*0x04*/ s8 seconds;
++#if WASM
++    u8 padding[3];
++#endif
+ };
+ 
+ struct Pokedex
+@@ -458,6 +471,9 @@ struct BattleFrontier
+     /*0xEFA*/ u8 unused_EFA;
+     /*0xEFB*/ u8 unused_EFB;
+     /*0xEFC*/ struct DomeMonData domePlayerPartyData[FRONTIER_PARTY_SIZE];
++#if WASM
++    u8 wasmPadding[0x20];
++#endif
+ };
+ 
+ struct ApprenticeQuestion
+@@ -602,6 +618,9 @@ struct Pokeblock
+     u8 bitter;
+     u8 sour;
+     u8 feel;
++#if WASM
++    u8 wasmPadding;
++#endif
+ };
+ 
+ struct Roamer
+@@ -732,6 +751,9 @@ struct LinkBattleRecords
+ {
+     struct LinkBattleRecord entries[LINK_B_RECORDS_COUNT];
+     u8 languages[LINK_B_RECORDS_COUNT];
++#if WASM
++    u8 wasmPadding[2];
++#endif
+     //u8 padding;
+ };
+ 
+@@ -768,6 +790,9 @@ struct Mail
+     /*0x1A*/ u8 trainerId[TRAINER_ID_LENGTH];
+     /*0x1E*/ u16 species;
+     /*0x20*/ u16 itemId;
++#if WASM
++    u8 wasmPadding[2];
++#endif
+ };
+ 
+ struct DaycareMail
+diff --git a/include/graphics.h b/include/graphics.h
+index 14f2f5e7..f8cacc8c 100644
+--- a/include/graphics.h
++++ b/include/graphics.h
+@@ -5024,7 +5024,11 @@ extern const u16 gFrontierFactoryMenu_Tilemap[];
+ extern const u16 gFrontierFactoryMenu_Pal[];
+ 
+ // Object event pals
++#if WASM
++extern u16 gObjectEventPal_Brendan[];
++#else
+ extern const u16 gObjectEventPal_Brendan[];
++#endif
+ extern const u16 gObjectEventPal_May[];
+ extern const u16 gObjectEventPal_RubySapphireBrendan[];
+ extern const u16 gObjectEventPal_RubySapphireMay[];
+diff --git a/include/load_save.h b/include/load_save.h
+index 389bd5a2..1e1cee8e 100644
+--- a/include/load_save.h
++++ b/include/load_save.h
+@@ -46,6 +46,11 @@ void SetContinueGameWarpStatusToDynamicWarp(void);
+ void ClearContinueGameWarpStatus2(void);
+ void SavePlayerParty(void);
+ void LoadPlayerParty(void);
++void ClearWallyTutorialPartyBackup(void);
++void BackupPlayerPartyForWallyTutorial(void);
++bool8 IsWallyTutorialPartyActive(void);
++struct Pokemon *GetWallyTutorialSavedSlot0(void);
++u8 GetWallyTutorialSavedPartyCount(void);
+ void SaveObjectEvents(void);
+ void LoadObjectEvents(void);
+ void CopyPartyAndObjectsToSave(void);
+diff --git a/include/sprite.h b/include/sprite.h
+index 822c9869..c003bef5 100644
+--- a/include/sprite.h
++++ b/include/sprite.h
+@@ -277,6 +277,9 @@ void SetOamMatrix(u8 matrixNum, u16 a, u16 b, u16 c, u16 d);
+ void CalcCenterToCornerVec(struct Sprite *sprite, u8 shape, u8 size, u8 affineMode);
+ void SpriteCallbackDummy(struct Sprite *sprite);
+ void ProcessSpriteCopyRequests(void);
++#if WASM
++void WasmSetSpriteActive(u8 spriteId, bool8 active);
++#endif
+ void RequestSpriteCopy(const u8 *src, u8 *dest, u16 size);
+ void FreeSpriteTiles(struct Sprite *sprite);
+ void FreeSpritePalette(struct Sprite *sprite);
+diff --git a/json_data_rules.mk b/json_data_rules.mk
+index 08a2d002..778d8ae8 100755
+--- a/json_data_rules.mk
++++ b/json_data_rules.mk
+@@ -5,13 +5,11 @@ AUTO_GEN_TARGETS += $(DATA_SRC_SUBDIR)/wild_encounters.h
+ $(DATA_SRC_SUBDIR)/wild_encounters.h: $(DATA_SRC_SUBDIR)/wild_encounters.json $(DATA_SRC_SUBDIR)/wild_encounters.json.txt
+ 	$(JSONPROC) $^ $@
+ 
+-$(C_BUILDDIR)/wild_encounter.o: c_dep += $(DATA_SRC_SUBDIR)/wild_encounters.h
+ 
+ AUTO_GEN_TARGETS += $(DATA_SRC_SUBDIR)/region_map/region_map_entries.h
+ $(DATA_SRC_SUBDIR)/region_map/region_map_entries.h: $(DATA_SRC_SUBDIR)/region_map/region_map_sections.json $(DATA_SRC_SUBDIR)/region_map/region_map_sections.json.txt
+ 	$(JSONPROC) $^ $@
+ 
+-$(C_BUILDDIR)/region_map.o: c_dep += $(DATA_SRC_SUBDIR)/region_map/region_map_entries.h
+ 
+ AUTO_GEN_TARGETS += include/constants/region_map_sections.h
+ include/constants/region_map_sections.h: $(DATA_SRC_SUBDIR)/region_map/region_map_sections.json $(DATA_SRC_SUBDIR)/region_map/region_map_sections.constants.json.txt
+@@ -21,7 +19,6 @@ AUTO_GEN_TARGETS += $(DATA_SRC_SUBDIR)/heal_locations.h
+ $(DATA_SRC_SUBDIR)/heal_locations.h: $(DATA_SRC_SUBDIR)/heal_locations.json $(DATA_SRC_SUBDIR)/heal_locations.json.txt
+ 	$(JSONPROC) $^ $@
+ 
+-$(C_BUILDDIR)/heal_location.o: c_dep += $(DATA_SRC_SUBDIR)/heal_locations.h
+ 
+ AUTO_GEN_TARGETS += include/constants/heal_locations.h
+ include/constants/heal_locations.h: $(DATA_SRC_SUBDIR)/heal_locations.json $(DATA_SRC_SUBDIR)/heal_locations.constants.json.txt
+diff --git a/make_tools.mk b/make_tools.mk
+index d28ebdf2..07cdf163 100644
+--- a/make_tools.mk
++++ b/make_tools.mk
+@@ -5,7 +5,7 @@ MAKEFLAGS += --no-print-directory
+ 
+ # Inclusive list. If you don't want a tool to be built, don't add it here.
+ TOOLS_DIR := tools
+-TOOL_NAMES := bin2c gbafix gbagfx jsonproc mapjson mid2agb preproc ramscrgen rsfont scaninc wav2agb
++TOOL_NAMES := gbagfx jsonproc mapjson mid2agb preproc wav2agb
+ 
+ TOOLDIRS := $(TOOL_NAMES:%=$(TOOLS_DIR)/%)
+ 
+diff --git a/map_data_rules.mk b/map_data_rules.mk
+index cad05316..a19d7a8c 100755
+--- a/map_data_rules.mk
++++ b/map_data_rules.mk
+@@ -19,12 +19,6 @@ MAP_EVENTS := $(patsubst $(MAPS_DIR)/%/,$(MAPS_DIR)/%/events.inc,$(MAP_DIRS))
+ MAP_HEADERS := $(patsubst $(MAPS_DIR)/%/,$(MAPS_DIR)/%/header.inc,$(MAP_DIRS))
+ MAP_JSONS := $(patsubst $(MAPS_DIR)/%/,$(MAPS_DIR)/%/map.json,$(MAP_DIRS))
+ 
+-$(DATA_ASM_BUILDDIR)/maps.o: $(DATA_ASM_SUBDIR)/maps.s $(LAYOUTS_DIR)/layouts.inc $(LAYOUTS_DIR)/layouts_table.inc $(MAPS_DIR)/headers.inc $(MAPS_DIR)/groups.inc $(MAPS_DIR)/connections.inc $(MAP_CONNECTIONS) $(MAP_HEADERS)
+-	$(PREPROC) $< charmap.txt | $(CPP) -I include - | $(PREPROC) -ie $< charmap.txt | $(AS) $(ASFLAGS) -o $@
+-$(DATA_ASM_BUILDDIR)/map_events.o: $(DATA_ASM_SUBDIR)/map_events.s $(MAPS_DIR)/events.inc $(MAP_EVENTS)
+-	$(PREPROC) $< charmap.txt | $(CPP) -I include - | $(PREPROC) -ie $< charmap.txt | $(AS) $(ASFLAGS) -o $@
+-
+-
+ $(MAPS_OUTDIR)/%/header.inc $(MAPS_OUTDIR)/%/events.inc $(MAPS_OUTDIR)/%/connections.inc: $(MAPS_DIR)/%/map.json
+ 	$(MAPJSON) map emerald $< $(LAYOUTS_DIR)/layouts.json $(@D)
+ 
+diff --git a/src/agb_flash.c b/src/agb_flash.c
+index ffec206f..45a717a5 100644
+--- a/src/agb_flash.c
++++ b/src/agb_flash.c
+@@ -8,6 +8,16 @@ static u16 sSavedIme;
+ 
+ COMMON_DATA u8 gFlashTimeoutFlag = 0;
+ COMMON_DATA u8 (*PollFlashStatus)(u8 *) = NULL;
++#if WASM
++COMMON_DATA u16 (*WaitForFlashWrite)(u8 phase, u8 *addr, u8 lastData) = WaitForFlashWrite_Common;
++COMMON_DATA u16 (*ProgramFlashSector)(u16 sectorNum, u8 *src) = ProgramFlashSector_MX;
++COMMON_DATA const struct FlashType *gFlash = &DefaultFlash.type;
++COMMON_DATA u16 (*ProgramFlashByte)(u16 sectorNum, u32 offset, u8 data) = ProgramFlashByte_MX;
++COMMON_DATA u16 gFlashNumRemainingBytes = 0;
++COMMON_DATA u16 (*EraseFlashChip)() = EraseFlashChip_MX;
++COMMON_DATA u16 (*EraseFlashSector)(u16 sectorNum) = EraseFlashSector_MX;
++COMMON_DATA const u16 *gFlashMaxTime = NULL;
++#else
+ COMMON_DATA u16 (*WaitForFlashWrite)(u8 phase, u8 *addr, u8 lastData) = NULL;
+ COMMON_DATA u16 (*ProgramFlashSector)(u16 sectorNum, u8 *src) = NULL;
+ COMMON_DATA const struct FlashType *gFlash = NULL;
+@@ -16,6 +26,7 @@ COMMON_DATA u16 gFlashNumRemainingBytes = 0;
+ COMMON_DATA u16 (*EraseFlashChip)() = NULL;
+ COMMON_DATA u16 (*EraseFlashSector)(u16 sectorNum) = 0;
+ COMMON_DATA const u16 *gFlashMaxTime = NULL;
++#endif
+ 
+ void SetReadFlash1(u16 *dest);
+ 
+@@ -138,6 +149,13 @@ void ReadFlash_Core(vu8 *src, u8 *dest, u32 size)
+ 
+ void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
+ {
++#if WASM
++    u32 i;
++    u8 *src = FLASH_BASE + (sectorNum << gFlash->sector.shift) + offset;
++
++    for (i = 0; i < size; i++)
++        dest[i] = src[i];
++#else
+     u8 *src;
+     u16 i;
+     vu16 readFlash_Core_Buffer[0x40];
+@@ -170,6 +188,7 @@ void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
+     src = FLASH_BASE + (sectorNum << gFlash->sector.shift) + offset;
+ 
+     readFlash_Core(src, dest, size);
++#endif
+ }
+ 
+ u32 VerifyFlashSector_Core(u8 *src, u8 *tgt, u32 size)
+@@ -185,6 +204,17 @@ u32 VerifyFlashSector_Core(u8 *src, u8 *tgt, u32 size)
+ 
+ u32 VerifyFlashSector(u16 sectorNum, u8 *src)
+ {
++#if WASM
++    u32 i;
++    u8 *tgt = FLASH_BASE + (sectorNum << gFlash->sector.shift);
++
++    for (i = 0; i < gFlash->sector.size; i++)
++    {
++        if (tgt[i] != src[i])
++            return (u32)&tgt[i];
++    }
++    return 0;
++#else
+     u16 i;
+     vu16 verifyFlashSector_Core_Buffer[0x80];
+     vu16 *funcSrc;
+@@ -219,10 +249,22 @@ u32 VerifyFlashSector(u16 sectorNum, u8 *src)
+     size = gFlash->sector.size;
+ 
+     return verifyFlashSector_Core(src, tgt, size);
++#endif
+ }
+ 
+ u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n)
+ {
++#if WASM
++    u32 i;
++    u8 *tgt = FLASH_BASE + (sectorNum << gFlash->sector.shift);
++
++    for (i = 0; i < n; i++)
++    {
++        if (tgt[i] != src[i])
++            return (u32)&tgt[i];
++    }
++    return 0;
++#else
+     u16 i;
+     vu16 verifyFlashSector_Core_Buffer[0x80];
+     vu16 *funcSrc;
+@@ -255,6 +297,7 @@ u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n)
+     tgt = FLASH_BASE + (sectorNum << gFlash->sector.shift);
+ 
+     return verifyFlashSector_Core(src, tgt, n);
++#endif
+ }
+ 
+ u32 ProgramFlashSectorAndVerify(u16 sectorNum, u8 *src)
+diff --git a/src/agb_flash_1m.c b/src/agb_flash_1m.c
+index f5ebd83a..ec650268 100644
+--- a/src/agb_flash_1m.c
++++ b/src/agb_flash_1m.c
+@@ -12,6 +12,16 @@ static const struct FlashSetupInfo *const sSetupInfos[] =
+ 
+ u16 IdentifyFlash(void)
+ {
++#if WASM
++    ProgramFlashByte = ProgramFlashByte_MX;
++    ProgramFlashSector = ProgramFlashSector_MX;
++    EraseFlashChip = EraseFlashChip_MX;
++    EraseFlashSector = EraseFlashSector_MX;
++    WaitForFlashWrite = WaitForFlashWrite_Common;
++    gFlashMaxTime = NULL;
++    gFlash = &DefaultFlash.type;
++    return 0;
++#else
+     u16 result;
+     u16 flashId;
+     const struct FlashSetupInfo *const *setupInfo;
+@@ -46,6 +56,7 @@ u16 IdentifyFlash(void)
+     gFlash = &(*setupInfo)->type;
+ 
+     return result;
++#endif
+ }
+ 
+ u16 WaitForFlashWrite_Common(u8 phase, u8 *addr, u8 lastData)
+diff --git a/src/agb_flash_mx.c b/src/agb_flash_mx.c
+index 01f84890..e25c38e5 100644
+--- a/src/agb_flash_mx.c
++++ b/src/agb_flash_mx.c
+@@ -53,6 +53,12 @@ const struct FlashSetupInfo DefaultFlash =
+ 
+ u16 EraseFlashChip_MX(void)
+ {
++#if WASM
++    u32 i;
++    for (i = 0; i < gFlash->romSize; i++)
++        FLASH_BASE[i] = 0xFF;
++    return 0;
++#else
+     u16 result;
+     u16 readFlash1Buffer[0x20];
+ 
+@@ -72,10 +78,23 @@ u16 EraseFlashChip_MX(void)
+     REG_WAITCNT = (REG_WAITCNT & ~WAITCNT_SRAM_MASK) | WAITCNT_SRAM_8;
+ 
+     return result;
++#endif
+ }
+ 
+ u16 EraseFlashSector_MX(u16 sectorNum)
+ {
++#if WASM
++    u32 i;
++    u8 *addr;
++
++    if (sectorNum >= gFlash->sector.count)
++        return 0x80FF;
++
++    addr = FLASH_BASE + (sectorNum << gFlash->sector.shift);
++    for (i = 0; i < gFlash->sector.size; i++)
++        addr[i] = 0xFF;
++    return 0;
++#else
+     u16 numTries;
+     u16 result;
+     u8 *addr;
+@@ -116,10 +135,20 @@ done:
+     REG_WAITCNT = (REG_WAITCNT & ~WAITCNT_SRAM_MASK) | WAITCNT_SRAM_8;
+ 
+     return result;
++#endif
+ }
+ 
+ u16 ProgramFlashByte_MX(u16 sectorNum, u32 offset, u8 data)
+ {
++#if WASM
++    if (sectorNum >= gFlash->sector.count)
++        return 0x80FF;
++    if (offset >= gFlash->sector.size)
++        return 0x8000;
++
++    FLASH_BASE[(sectorNum << gFlash->sector.shift) + offset] = data;
++    return 0;
++#else
+     u8 *addr;
+     u16 readFlash1Buffer[0x20];
+ 
+@@ -141,6 +170,7 @@ u16 ProgramFlashByte_MX(u16 sectorNum, u32 offset, u8 data)
+     *addr = data;
+ 
+     return WaitForFlashWrite(1, addr, data);
++#endif
+ }
+ 
+ static u16 ProgramByte(u8 *src, u8 *dest)
+@@ -155,6 +185,18 @@ static u16 ProgramByte(u8 *src, u8 *dest)
+ 
+ u16 ProgramFlashSector_MX(u16 sectorNum, u8 *src)
+ {
++#if WASM
++    u32 i;
++    u8 *dest;
++
++    if (sectorNum >= gFlash->sector.count)
++        return 0x80FF;
++
++    dest = FLASH_BASE + (sectorNum << gFlash->sector.shift);
++    for (i = 0; i < gFlash->sector.size; i++)
++        dest[i] = src[i];
++    return 0;
++#else
+     u16 result;
+     u8 *dest;
+     u16 readFlash1Buffer[0x20];
+@@ -190,4 +232,5 @@ u16 ProgramFlashSector_MX(u16 sectorNum, u8 *src)
+     }
+ 
+     return result;
++#endif
+ }
+diff --git a/src/battle_anim_electric.c b/src/battle_anim_electric.c
+index cc36e608..5b93cdce 100644
+--- a/src/battle_anim_electric.c
++++ b/src/battle_anim_electric.c
+@@ -658,7 +658,7 @@ static void AnimSparkElectricityFlashing_Step(struct Sprite *sprite)
+     sprite->y2 = Cos(sprite->data[7], sprite->data[5]);
+ 
+     sprite->data[7] = (sprite->data[7] + sprite->data[6]) & 0xFF;
+-    if (sprite->data[7] % sprite->data[4] == 0)
++    if (sprite->data[4] == 0 || sprite->data[7] % sprite->data[4] == 0)
+         sprite->invisible ^= TRUE;
+ 
+     if (sprite->data[0]-- <= 0)
+diff --git a/src/battle_anim_mons.c b/src/battle_anim_mons.c
+index dff3a71f..898c48cd 100644
+--- a/src/battle_anim_mons.c
++++ b/src/battle_anim_mons.c
+@@ -416,14 +416,15 @@ u8 GetAnimBattlerSpriteId(u8 animBattler)
+ 
+ void StoreSpriteCallbackInData6(struct Sprite *sprite, void (*callback)(struct Sprite *))
+ {
+-    sprite->data[6] = (u32)(callback) & 0xffff;
+-    sprite->data[7] = (u32)(callback) >> 16;
++    StoreWordInTwoHalfwords((u16 *)&sprite->data[6], (u32)(uintptr_t)callback);
+ }
+ 
+ void SetCallbackToStoredInData6(struct Sprite *sprite)
+ {
+-    u32 callback = (u16)sprite->data[6] | (sprite->data[7] << 16);
+-    sprite->callback = (void (*)(struct Sprite *))callback;
++    u32 callback;
++
++    LoadWordFromTwoHalfwords((u16 *)&sprite->data[6], &callback);
++    sprite->callback = (void (*)(struct Sprite *))(uintptr_t)callback;
+ }
+ 
+ // Sprite data for TranslateSpriteInCircle/Ellipse and related
+@@ -1637,6 +1638,9 @@ s16 CloneBattlerSpriteWithBlend(u8 animBattler)
+                 gSprites[i] = gSprites[spriteId];
+                 gSprites[i].oam.objMode = ST_OAM_OBJ_BLEND;
+                 gSprites[i].invisible = FALSE;
++#if WASM
++                WasmSetSpriteActive(i, TRUE);
++#endif
+                 return i;
+             }
+         }
+@@ -1952,7 +1956,7 @@ void StorePointerInVars(s16 *lo, s16 *hi, const void *ptr)
+ 
+ void *LoadPointerFromVars(s16 lo, s16 hi)
+ {
+-    return (void *)((u16)lo | ((u16)hi << 16));
++    return (void *)(uintptr_t)((u16)lo | ((u32)(u16)hi << 16));
+ }
+ 
+ void PrepareEruptAnimTaskData(struct Task *task, u8 spriteId, s16 xScaleStart, s16 yScaleStart, s16 xScaleEnd, s16 yScaleEnd, u16 duration)
+diff --git a/src/battle_anim_normal.c b/src/battle_anim_normal.c
+index 683328ea..c1e19747 100644
+--- a/src/battle_anim_normal.c
++++ b/src/battle_anim_normal.c
+@@ -5,6 +5,7 @@
+ #include "random.h"
+ #include "task.h"
+ #include "trig.h"
++#include "util.h"
+ #include "constants/rgb.h"
+ 
+ static void AnimConfusionDuck(struct Sprite *);
+@@ -17,6 +18,8 @@ static void AnimCirclingSparkle(struct Sprite *);
+ static void AnimShakeMonOrBattlePlatforms(struct Sprite *);
+ static void AnimShakeMonOrBattlePlatforms_Step(struct Sprite *);
+ static void AnimShakeMonOrBattlePlatforms_UpdateCoordOffsetEnabled(void);
++static void StoreShakePtrInData6(struct Sprite *, u16 *);
++static u16 *GetShakePtrFromData6(struct Sprite *);
+ static void AnimHitSplatBasic(struct Sprite *);
+ static void AnimHitSplatPersistent(struct Sprite *);
+ static void AnimHitSplatHandleInvert(struct Sprite *);
+@@ -538,7 +541,7 @@ void AnimTask_BlendColorCycleExclude(u8 taskId)
+ 
+ static void BlendColorCycleExclude(u8 taskId, u8 startBlendAmount, u8 targetBlendAmount)
+ {
+-    u32 selectedPalettes = ((u16)gTasks[taskId].tPalSelectorHi << 16) | (u16)gTasks[taskId].tPalSelectorLo;
++    u32 selectedPalettes = ((u32)(u16)gTasks[taskId].tPalSelectorHi << 16) | (u16)gTasks[taskId].tPalSelectorLo;
+     BeginNormalPaletteFade(
+         selectedPalettes,
+         gTasks[taskId].tDelay,
+@@ -850,6 +853,19 @@ void AnimTask_TintPalettes(u8 taskId)
+ #define sShakePtrLo    data[6]
+ #define sShakePtrHi    data[7]
+ 
++static void StoreShakePtrInData6(struct Sprite *sprite, u16 *shakePtr)
++{
++    StoreWordInTwoHalfwords((u16 *)&sprite->sShakePtrLo, (u32)(uintptr_t)shakePtr);
++}
++
++static u16 *GetShakePtrFromData6(struct Sprite *sprite)
++{
++    u32 ptr;
++
++    LoadWordFromTwoHalfwords((u16 *)&sprite->sShakePtrLo, &ptr);
++    return (u16 *)(uintptr_t)ptr;
++}
++
+ static void AnimShakeMonOrBattlePlatforms(struct Sprite *sprite)
+ {
+     CMD_ARGS(velocity, shakeTimer, shakeDuration, type, battlerSelector);
+@@ -863,20 +879,20 @@ static void AnimShakeMonOrBattlePlatforms(struct Sprite *sprite)
+     switch (cmd->type)
+     {
+     case SHAKE_BG_X:
+-        StoreSpriteCallbackInData6(sprite, (void *)&gBattle_BG3_X);
++        StoreShakePtrInData6(sprite, &gBattle_BG3_X);
+         break;
+     case SHAKE_BG_Y:
+-        StoreSpriteCallbackInData6(sprite, (void *)&gBattle_BG3_Y);
++        StoreShakePtrInData6(sprite, &gBattle_BG3_Y);
+         break;
+     case SHAKE_MON_X:
+-        StoreSpriteCallbackInData6(sprite, (void *)&gSpriteCoordOffsetX);
++        StoreShakePtrInData6(sprite, (u16 *)&gSpriteCoordOffsetX);
+         break;
+     default:
+-        StoreSpriteCallbackInData6(sprite, (void *)&gSpriteCoordOffsetY);
++        StoreShakePtrInData6(sprite, (u16 *)&gSpriteCoordOffsetY);
+         break;
+     }
+ 
+-    sprite->sOriginalValue = *(u16 *)(sprite->sShakePtrLo | (sprite->sShakePtrHi << 16));
++    sprite->sOriginalValue = *GetShakePtrFromData6(sprite);
+     sprite->sType = cmd->type;
+     if (sprite->sType == SHAKE_MON_X || sprite->sType == SHAKE_MON_Y)
+         AnimShakeMonOrBattlePlatforms_UpdateCoordOffsetEnabled();
+@@ -898,13 +914,13 @@ static void AnimShakeMonOrBattlePlatforms_Step(struct Sprite *sprite)
+         else
+         {
+             sprite->sShakeTimer = sprite->sShakeDuration;
+-            *(u16 *)(sprite->sShakePtrLo | (sprite->sShakePtrHi << 16)) += sprite->sShakeVelocity;
++            *GetShakePtrFromData6(sprite) += sprite->sShakeVelocity;
+             sprite->sShakeVelocity = -sprite->sShakeVelocity;
+         }
+     }
+     else
+     {
+-        *(u16 *)(sprite->sShakePtrLo | (sprite->sShakePtrHi << 16)) = sprite->sOriginalValue;
++        *GetShakePtrFromData6(sprite) = sprite->sOriginalValue;
+         if (sprite->sType == SHAKE_MON_X || sprite->sType == SHAKE_MON_Y)
+         {
+             for (i = 0; i < gBattlersCount; i++)
+diff --git a/src/battle_main.c b/src/battle_main.c
+index b89adb6a..441480db 100644
+--- a/src/battle_main.c
++++ b/src/battle_main.c
+@@ -47,6 +47,9 @@
+ #include "text.h"
+ #include "trig.h"
+ #include "tv.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "util.h"
+ #include "window.h"
+ #include "constants/abilities.h"
+@@ -1957,6 +1960,22 @@ static void SpriteCB_UnusedBattleInit_Main(struct Sprite *sprite)
+     }
+ }
+ 
++static u16 GetTrainerPokemonSpecies(u16 trainerNum, u8 partyIndex, u16 originalSpecies)
++{
++#if WASM
++    u16 species = WasmRunRandomSpecies(WasmRunTrainerKind(trainerNum), originalSpecies, trainerNum, partyIndex);
++    // A bad/stale run hook must not feed SPECIES_NONE, Egg, or an out-of-range
++    // ID to CreateMon and the species sprite/name tables.
++    if (species == SPECIES_NONE || species >= NUM_SPECIES)
++        return originalSpecies;
++    return species;
++#else
++    (void)trainerNum;
++    (void)partyIndex;
++    return originalSpecies;
++#endif
++}
++
+ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 firstTrainer)
+ {
+     u32 nameHash = 0;
+@@ -2006,29 +2025,36 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+             {
+                 const struct TrainerMonNoItemDefaultMoves *partyData = gTrainers[trainerNum].party.NoItemDefaultMoves;
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                {
++                    u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
++                    for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                        nameHash += gSpeciesNames[species][j];
+ 
+-                personalityValue += nameHash << 8;
+-                fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                    personalityValue += nameHash << 8;
++                    fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
++                    CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                }
+                 break;
+             }
+             case F_TRAINER_PARTY_CUSTOM_MOVESET:
+             {
+                 const struct TrainerMonNoItemCustomMoves *partyData = gTrainers[trainerNum].party.NoItemCustomMoves;
++                u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                    nameHash += gSpeciesNames[species][j];
+ 
+                 personalityValue += nameHash << 8;
+                 fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
+ 
+-                for (j = 0; j < MAX_MON_MOVES; j++)
++                if (species == partyData[i].species)
+                 {
+-                    SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
+-                    SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    for (j = 0; j < MAX_MON_MOVES; j++)
++                    {
++                        SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
++                        SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    }
+                 }
+                 break;
+             }
+@@ -2036,12 +2062,15 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+             {
+                 const struct TrainerMonItemDefaultMoves *partyData = gTrainers[trainerNum].party.ItemDefaultMoves;
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                {
++                    u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
++                    for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                        nameHash += gSpeciesNames[species][j];
+ 
+-                personalityValue += nameHash << 8;
+-                fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                    personalityValue += nameHash << 8;
++                    fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
++                    CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                }
+ 
+                 SetMonData(&party[i], MON_DATA_HELD_ITEM, &partyData[i].heldItem);
+                 break;
+@@ -2049,20 +2078,24 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+             case F_TRAINER_PARTY_CUSTOM_MOVESET | F_TRAINER_PARTY_HELD_ITEM:
+             {
+                 const struct TrainerMonItemCustomMoves *partyData = gTrainers[trainerNum].party.ItemCustomMoves;
++                u16 species = GetTrainerPokemonSpecies(trainerNum, i, partyData[i].species);
+ 
+-                for (j = 0; gSpeciesNames[partyData[i].species][j] != EOS; j++)
+-                    nameHash += gSpeciesNames[partyData[i].species][j];
++                for (j = 0; gSpeciesNames[species][j] != EOS; j++)
++                    nameHash += gSpeciesNames[species][j];
+ 
+                 personalityValue += nameHash << 8;
+                 fixedIV = partyData[i].iv * MAX_PER_STAT_IVS / 255;
+-                CreateMon(&party[i], partyData[i].species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
++                CreateMon(&party[i], species, partyData[i].lvl, fixedIV, TRUE, personalityValue, OT_ID_RANDOM_NO_SHINY, 0);
+ 
+                 SetMonData(&party[i], MON_DATA_HELD_ITEM, &partyData[i].heldItem);
+ 
+-                for (j = 0; j < MAX_MON_MOVES; j++)
++                if (species == partyData[i].species)
+                 {
+-                    SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
+-                    SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    for (j = 0; j < MAX_MON_MOVES; j++)
++                    {
++                        SetMonData(&party[i], MON_DATA_MOVE1 + j, &partyData[i].moves[j]);
++                        SetMonData(&party[i], MON_DATA_PP1 + j, &gBattleMoves[partyData[i].moves[j]].pp);
++                    }
+                 }
+                 break;
+             }
+@@ -2075,6 +2108,20 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum, bool8 fir
+     return gTrainers[trainerNum].partySize;
+ }
+ 
++#if WASM
++u32 WasmRunTestCreateTrainerParty(u16 trainerId)
++{
++    u32 previousFlags = gBattleTypeFlags;
++    u8 count;
++    if (trainerId >= TRAINER_SECRET_BASE)
++        return 0;
++    gBattleTypeFlags |= BATTLE_TYPE_TRAINER;
++    count = CreateNPCTrainerParty(gEnemyParty, trainerId, TRUE);
++    gBattleTypeFlags = previousFlags;
++    return count;
++}
++#endif
++
+ static void UNUSED HBlankCB_Battle(void)
+ {
+     if (REG_VCOUNT < DISPLAY_HEIGHT && REG_VCOUNT >= 111)
+diff --git a/src/battle_message.c b/src/battle_message.c
+index 2d187de2..7df63580 100644
+--- a/src/battle_message.c
++++ b/src/battle_message.c
+@@ -462,6 +462,7 @@ static const u8 sText_PlayerUsedItem[] = _("{B_PLAYER_NAME} used\n{B_LAST_ITEM}!
+ static const u8 sText_WallyUsedItem[] = _("WALLY used\n{B_LAST_ITEM}!");
+ static const u8 sText_Trainer1UsedItem[] = _("{B_TRAINER1_CLASS} {B_TRAINER1_NAME}\nused {B_LAST_ITEM}!");
+ static const u8 sText_TrainerBlockedBall[] = _("The TRAINER blocked the BALL!");
++static const u8 sText_RunCaptureBlocked[] = _("This run's rules prevent the capture!");
+ static const u8 sText_DontBeAThief[] = _("Don't be a thief!");
+ static const u8 sText_ItDodgedBall[] = _("It dodged the thrown BALL!\nThis POKéMON can't be caught!");
+ static const u8 sText_YouMissedPkmn[] = _("You missed the POKéMON!");
+@@ -764,6 +765,7 @@ const u8 *const gBattleStringsTable[BATTLESTRINGS_COUNT - BATTLESTRINGS_TABLE_ST
+     [STRINGID_PLAYERUSEDITEM - BATTLESTRINGS_TABLE_START] = sText_PlayerUsedItem,
+     [STRINGID_WALLYUSEDITEM - BATTLESTRINGS_TABLE_START] = sText_WallyUsedItem,
+     [STRINGID_TRAINERBLOCKEDBALL - BATTLESTRINGS_TABLE_START] = sText_TrainerBlockedBall,
++    [STRINGID_RUNCAPTUREBLOCKED - BATTLESTRINGS_TABLE_START] = sText_RunCaptureBlocked,
+     [STRINGID_DONTBEATHIEF - BATTLESTRINGS_TABLE_START] = sText_DontBeAThief,
+     [STRINGID_ITDODGEDBALL - BATTLESTRINGS_TABLE_START] = sText_ItDodgedBall,
+     [STRINGID_YOUMISSEDPKMN - BATTLESTRINGS_TABLE_START] = sText_YouMissedPkmn,
+diff --git a/src/battle_script_commands.c b/src/battle_script_commands.c
+index c4b6b154..757db777 100644
+--- a/src/battle_script_commands.c
++++ b/src/battle_script_commands.c
+@@ -36,6 +36,9 @@
+ #include "battle_pyramid.h"
+ #include "field_specials.h"
+ #include "pokemon_summary_screen.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "pokenav.h"
+ #include "menu_specialized.h"
+ #include "data.h"
+@@ -3010,6 +3013,12 @@ static void Cmd_tryfaintmon(void)
+                 if (gBattleResults.playerFaintCounter < 255)
+                     gBattleResults.playerFaintCounter++;
+                 AdjustFriendshipOnBattleFaint(gActiveBattler);
++#if WASM
++                WasmRunOnFaint(
++                    gBattleMons[gActiveBattler].personality & 0xffff,
++                    gBattleMons[gActiveBattler].personality >> 16,
++                    gCurrentMove);
++#endif
+             }
+             else
+             {
+@@ -3252,6 +3261,46 @@ static void Cmd_jumpiftype(void)
+         gBattlescriptCurrInstr += 7;
+ }
+ 
++#if WASM
++static u32 ClampRunExperienceGain(u16 species, u32 currentExp, u32 expGain, u32 levelCap)
++{
++    u32 nextLevel;
++    u32 capExp;
++    if (levelCap == 0 || levelCap >= MAX_LEVEL || species == SPECIES_NONE)
++        return expGain;
++    nextLevel = levelCap + 1;
++    capExp = gExperienceTables[gSpeciesInfo[species].growthRate][nextLevel];
++    if (capExp > 0)
++        capExp--;
++    if (currentExp >= capExp)
++        return 0;
++    if (expGain > capExp - currentExp)
++        return capExp - currentExp;
++    return expGain;
++}
++
++u32 WasmRunDebugApplyExpGain(u32 index, u32 expGain)
++{
++    struct Pokemon *mon;
++    u16 species;
++    u32 currentExp;
++    u32 gained;
++    u32 nextExp;
++    if (index >= PARTY_SIZE)
++        return 0;
++    mon = &gPlayerParty[index];
++    species = GetMonData(mon, MON_DATA_SPECIES, NULL);
++    if (species == SPECIES_NONE)
++        return 0;
++    currentExp = GetMonData(mon, MON_DATA_EXP, NULL);
++    gained = ClampRunExperienceGain(species, currentExp, expGain, WasmRunGymLevelCap());
++    nextExp = currentExp + gained;
++    SetMonData(mon, MON_DATA_EXP, &nextExp);
++    CalculateMonStats(mon);
++    return GetMonData(mon, MON_DATA_LEVEL, NULL);
++}
++#endif
++
+ static void Cmd_getexp(void)
+ {
+     u16 item;
+@@ -3260,6 +3309,9 @@ static void Cmd_getexp(void)
+     s32 sentIn;
+     s32 viaExpShare = 0;
+     u16 *exp = &gBattleStruct->expValue;
++#if WASM
++    u32 runLevelCap = WasmRunGymLevelCap();
++#endif
+ 
+     gBattlerFainted = GetBattlerForBattleScript(gBattlescriptCurrInstr[1]);
+     sentIn = gSentPokesToOpponent[(gBattlerFainted & 2) >> 1];
+@@ -3348,7 +3400,11 @@ static void Cmd_getexp(void)
+                 gBattleScripting.getexpState = 5;
+                 gBattleMoveDamage = 0; // used for exp
+             }
+-            else if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) == MAX_LEVEL)
++            else if (GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) == MAX_LEVEL
++#if WASM
++                || (runLevelCap > 0 && GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_LEVEL) >= runLevelCap)
++#endif
++            )
+             {
+                 *(&gBattleStruct->sentInPokes) >>= 1;
+                 gBattleScripting.getexpState = 5;
+@@ -3396,6 +3452,14 @@ static void Cmd_getexp(void)
+                         i = STRINGID_EMPTYSTRING4;
+                     }
+ 
++#if WASM
++                    gBattleMoveDamage = ClampRunExperienceGain(
++                        GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_SPECIES, NULL),
++                        GetMonData(&gPlayerParty[gBattleStruct->expGetterMonId], MON_DATA_EXP, NULL),
++                        gBattleMoveDamage,
++                        runLevelCap);
++#endif
++
+                     // get exp getter battler
+                     if (gBattleTypeFlags & BATTLE_TYPE_DOUBLE)
+                     {
+@@ -9912,6 +9976,22 @@ static void Cmd_handleballthrow(void)
+     gActiveBattler = gBattlerAttacker;
+     gBattlerTarget = BATTLE_OPPOSITE(gBattlerAttacker);
+ 
++#if WASM
++    if (!(gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_WALLY_TUTORIAL))
++        && !WasmRunAllowCapture(WasmRunMapSection(),
++            gBattleMons[gBattlerTarget].species,
++            gBattleMons[gBattlerTarget].personality & 0xffff,
++            gBattleMons[gBattlerTarget].personality >> 16))
++    {
++        if (gMain.inBattle && gLastUsedItem != ITEM_NONE)
++            AddBagItem(gLastUsedItem, 1);
++        BtlController_EmitBallThrowAnim(B_COMM_TO_CONTROLLER, BALL_TRAINER_BLOCK);
++        MarkBattlerForControllerExec(gActiveBattler);
++        gBattlescriptCurrInstr = BattleScript_RunCaptureBlocked;
++        return;
++    }
++#endif
++
+     if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+     {
+         BtlController_EmitBallThrowAnim(B_COMM_TO_CONTROLLER, BALL_TRAINER_BLOCK);
+@@ -9979,19 +10059,26 @@ static void Cmd_handleballthrow(void)
+                 break;
+             }
+         }
+-        else
++        else if (gLastUsedItem != ITEM_MASTER_BALL)
+         {
+             ballMultiplier = sBallCatchBonuses[gLastUsedItem - ITEM_ULTRA_BALL];
+         }
+ 
+-        odds = (catchRate * ballMultiplier / 10)
+-            * (gBattleMons[gBattlerTarget].maxHP * 3 - gBattleMons[gBattlerTarget].hp * 2)
+-            / (3 * gBattleMons[gBattlerTarget].maxHP);
++        if (gLastUsedItem == ITEM_MASTER_BALL)
++        {
++            odds = 255;
++        }
++        else
++        {
++            odds = (catchRate * ballMultiplier / 10)
++                * (gBattleMons[gBattlerTarget].maxHP * 3 - gBattleMons[gBattlerTarget].hp * 2)
++                / (3 * gBattleMons[gBattlerTarget].maxHP);
+ 
+-        if (gBattleMons[gBattlerTarget].status1 & (STATUS1_SLEEP | STATUS1_FREEZE))
+-            odds *= 2;
+-        if (gBattleMons[gBattlerTarget].status1 & (STATUS1_POISON | STATUS1_BURN | STATUS1_PARALYSIS | STATUS1_TOXIC_POISON))
+-            odds = (odds * 15) / 10;
++            if (gBattleMons[gBattlerTarget].status1 & (STATUS1_SLEEP | STATUS1_FREEZE))
++                odds *= 2;
++            if (gBattleMons[gBattlerTarget].status1 & (STATUS1_POISON | STATUS1_BURN | STATUS1_PARALYSIS | STATUS1_TOXIC_POISON))
++                odds = (odds * 15) / 10;
++        }
+ 
+         if (gLastUsedItem != ITEM_SAFARI_BALL)
+         {
+@@ -10052,9 +10139,68 @@ static void Cmd_handleballthrow(void)
+     }
+ }
+ 
++#if WASM
++// Automation-only conformance probe. Run the real command through its blocked
++// branch, then restore controller/battle scratch state so this probe cannot
++// perturb the active field simulation.
++u32 WasmRunDebugTryBlockedBallThrow(u16 species, u32 pidLo, u32 pidHi)
++{
++    struct BattlePokemon savedTarget = gBattleMons[1];
++    const u8 *savedScript = gBattlescriptCurrInstr;
++    u32 savedBattleTypeFlags = gBattleTypeFlags;
++    u32 savedControllerExecFlags = gBattleControllerExecFlags;
++    u16 savedLastUsedItem = gLastUsedItem;
++    u8 savedAttacker = gBattlerAttacker;
++    u8 savedTargetBattler = gBattlerTarget;
++    u8 savedActiveBattler = gActiveBattler;
++    u8 savedBattleBuffer[0x200];
++    u16 i;
++    u32 wasBlocked;
++
++    for (i = 0; i < sizeof(savedBattleBuffer); i++)
++        savedBattleBuffer[i] = gBattleBufferA[0][i];
++    gBattleTypeFlags = 0;
++    gBattleControllerExecFlags = 0;
++    gBattlerAttacker = 0;
++    gActiveBattler = 0;
++    gLastUsedItem = ITEM_POKE_BALL;
++    gBattleMons[1].species = species;
++    gBattleMons[1].personality = (pidLo & 0xffff) | ((pidHi & 0xffff) << 16);
++    Cmd_handleballthrow();
++    wasBlocked = gBattlescriptCurrInstr == BattleScript_RunCaptureBlocked;
++
++    for (i = 0; i < sizeof(savedBattleBuffer); i++)
++        gBattleBufferA[0][i] = savedBattleBuffer[i];
++    gBattleMons[1] = savedTarget;
++    gBattlescriptCurrInstr = savedScript;
++    gBattleTypeFlags = savedBattleTypeFlags;
++    gBattleControllerExecFlags = savedControllerExecFlags;
++    gLastUsedItem = savedLastUsedItem;
++    gBattlerAttacker = savedAttacker;
++    gBattlerTarget = savedTargetBattler;
++    gActiveBattler = savedActiveBattler;
++    return wasBlocked;
++}
++#endif
++
+ static void Cmd_givecaughtmon(void)
+ {
+-    if (GiveMonToPlayer(&gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]]) != MON_GIVEN_TO_PARTY)
++    struct Pokemon *caughtMon = &gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(gBattlerAttacker)]];
++#if WASM
++    WasmRunAutoLevelCaughtMon(caughtMon);
++#endif
++    u8 result = GiveMonToPlayer(caughtMon);
++#if WASM
++    if (result != MON_CANT_GIVE)
++    {
++        u32 personality = GetMonData(caughtMon, MON_DATA_PERSONALITY, NULL);
++        WasmRunOnCapture(WasmRunMapSection(), WasmRunMapSection(),
++            GetMonData(caughtMon, MON_DATA_SPECIES, NULL),
++            GetMonData(caughtMon, MON_DATA_LEVEL, NULL),
++            personality & 0xffff, personality >> 16);
++    }
++#endif
++    if (result != MON_GIVEN_TO_PARTY)
+     {
+         if (!ShouldShowBoxWasFullMessage())
+         {
+@@ -10082,6 +10228,41 @@ static void Cmd_givecaughtmon(void)
+     gBattlescriptCurrInstr++;
+ }
+ 
++#if WASM
++// Automation-only acceptance probe for the same pre-capture gate and
++// GiveMonToPlayer/OnCapture path used after a successful ball throw.
++u32 WasmRunDebugAcceptWildCapture(void)
++{
++    struct Pokemon *caughtMon = &gEnemyParty[0];
++    u16 species = GetMonData(caughtMon, MON_DATA_SPECIES, NULL);
++    u32 personality = GetMonData(caughtMon, MON_DATA_PERSONALITY, NULL);
++    u32 sectionId = WasmRunMapSection();
++    struct BattleResults savedResults = gBattleResults;
++    const u8 *savedScript = gBattlescriptCurrInstr;
++    u8 savedBattlerAttacker = gBattlerAttacker;
++    u8 savedPartyIndex = gBattlerPartyIndexes[1];
++    static const u8 sTestScript[2] = { 0, 0 };
++    u8 result;
++
++    if (species == SPECIES_NONE || !WasmRunAllowCapture(sectionId, species, personality & 0xffff, personality >> 16))
++        return MON_CANT_GIVE;
++
++    // Exercise the production caught-mon script command and its SoulLink
++    // notification, restoring battle scratch state after the test handoff.
++    gBattlerAttacker = 0;
++    gBattlerPartyIndexes[1] = 0;
++    gBattlescriptCurrInstr = sTestScript;
++    Cmd_givecaughtmon();
++    result = GetMonData(&gPlayerParty[CalculatePlayerPartyCount() - 1], MON_DATA_SPECIES, NULL) == species
++        ? MON_GIVEN_TO_PARTY : MON_CANT_GIVE;
++    gBattleResults = savedResults;
++    gBattlescriptCurrInstr = savedScript;
++    gBattlerAttacker = savedBattlerAttacker;
++    gBattlerPartyIndexes[1] = savedPartyIndex;
++    return result;
++}
++#endif
++
+ static void Cmd_trysetcaughtmondexflags(void)
+ {
+     u16 species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES, NULL);
+diff --git a/src/battle_util.c b/src/battle_util.c
+index bee4f927..01bdab19 100644
+--- a/src/battle_util.c
++++ b/src/battle_util.c
+@@ -3912,12 +3912,17 @@ u8 GetMoveTarget(u16 move, u8 setTarget)
+ 
+ static bool32 IsBattlerModernFatefulEncounter(u8 battler)
+ {
++#if WASM
++    (void)battler;
++    return TRUE;
++#else
+     if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
+         return TRUE;
+     if (GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES, NULL) != SPECIES_DEOXYS
+         && GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES, NULL) != SPECIES_MEW)
+             return TRUE;
+     return GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_MODERN_FATEFUL_ENCOUNTER, NULL);
++#endif
+ }
+ 
+ u8 IsMonDisobedient(void)
+diff --git a/src/data/object_events/object_event_graphics.h b/src/data/object_events/object_event_graphics.h
+index 3bbdbf53..e431d349 100755
+--- a/src/data/object_events/object_event_graphics.h
++++ b/src/data/object_events/object_event_graphics.h
+@@ -1,6 +1,12 @@
++#if WASM
++u32 gObjectEventPic_BrendanNormal[] = INCGFX_U32("graphics/object_events/pics/people/brendan/walking.png", ".4bpp", "-mwidth 2 -mheight 4");
++u32 gObjectEventPic_BrendanRunning[] = INCGFX_U32("graphics/object_events/pics/people/brendan/running.png", ".4bpp", "-mwidth 2 -mheight 4");
++u16 gObjectEventPal_Brendan[] = INCGFX_U16("graphics/object_events/palettes/brendan.pal", ".gbapal");
++#else
+ const u32 gObjectEventPic_BrendanNormal[] = INCGFX_U32("graphics/object_events/pics/people/brendan/walking.png", ".4bpp", "-mwidth 2 -mheight 4");
+ const u32 gObjectEventPic_BrendanRunning[] = INCGFX_U32("graphics/object_events/pics/people/brendan/running.png", ".4bpp", "-mwidth 2 -mheight 4");
+ const u16 gObjectEventPal_Brendan[] = INCGFX_U16("graphics/object_events/palettes/brendan.pal", ".gbapal");
++#endif
+ const u32 gObjectEventPic_RubySapphireBrendanNormal[] = INCGFX_U32("graphics/object_events/pics/people/ruby_sapphire_brendan/walking.png", ".4bpp", "-mwidth 2 -mheight 4");
+ const u32 gObjectEventPic_RubySapphireBrendanRunning[] = INCGFX_U32("graphics/object_events/pics/people/ruby_sapphire_brendan/running.png", ".4bpp", "-mwidth 2 -mheight 4");
+ const u16 gObjectEventPal_RubySapphireBrendan[] = INCGFX_U16("graphics/object_events/palettes/ruby_sapphire_brendan.pal", ".gbapal");
+@@ -19,7 +25,11 @@ const u16 gObjectEventPal_Null12[16] = {};
+ const u16 gObjectEventPal_Null13[16] = {};
+ const u16 gObjectEventPal_Null14[16] = {};
+ const u16 gObjectEventPal_Null15[16] = {};
++#if WASM
++u16 gObjectEventPal_BrendanReflection[] = INCGFX_U16("graphics/object_events/palettes/brendan_reflection.pal", ".gbapal");
++#else
+ const u16 gObjectEventPal_BrendanReflection[] = INCGFX_U16("graphics/object_events/palettes/brendan_reflection.pal", ".gbapal");
++#endif
+ const u16 gObjectEventPal_BridgeReflection[] = INCGFX_U16("graphics/object_events/palettes/bridge_reflection.pal", ".gbapal");
+ const u32 gObjectEventPic_BrendanFieldMove[] = INCGFX_U32("graphics/object_events/pics/people/brendan/field_move.png", ".4bpp", "-mwidth 4 -mheight 4");
+ const u32 gObjectEventPic_BrendanSurfing[] = INCGFX_U32("graphics/object_events/pics/people/brendan/surfing.png", ".4bpp", "-mwidth 4 -mheight 4");
+diff --git a/src/easy_chat.c b/src/easy_chat.c
+index 3ec6d347..8c0e98de 100644
+--- a/src/easy_chat.c
++++ b/src/easy_chat.c
+@@ -1327,6 +1327,10 @@ static void StartEasyChatScreen(u8 taskId, TaskFunc taskFunc)
+ 
+ static void Task_InitEasyChatScreen(u8 taskId)
+ {
++#if WASM
++    if (InitEasyChatScreen(taskId) == TRUE)
++        return;
++#else
+     if (!IsOverworldLinkActive())
+     {
+         while (InitEasyChatScreen(taskId));
+@@ -1336,6 +1340,7 @@ static void Task_InitEasyChatScreen(u8 taskId)
+         if (InitEasyChatScreen(taskId) == TRUE)
+             return;
+     }
++#endif
+     StartEasyChatScreen(taskId, Task_EasyChatScreen);
+ }
+ 
+diff --git a/src/event_object_movement.c b/src/event_object_movement.c
+index d9ca50fa..962e2bd3 100644
+--- a/src/event_object_movement.c
++++ b/src/event_object_movement.c
+@@ -30,6 +30,13 @@
+ #include "constants/trainer_types.h"
+ #include "constants/union_room.h"
+ 
++#if WASM
++extern u32 WasmHd2dEnabled(void);
++extern u32 WasmWorldWidth(void);
++extern u32 WasmWorldHeight(void);
++static bool8 sWasmHdOnlyObjectEvents[OBJECT_EVENTS_COUNT];
++#endif
++
+ #define SPECIAL_LOCALIDS_START (min(LOCALID_CAMERA, \
+                                 min(LOCALID_PLAYER, \
+                                     LOCALID_BERRY_BLENDER_PLAYER_END - MAX_RFU_PLAYERS + 1)))
+@@ -1642,17 +1649,111 @@ u8 CreateVirtualObject(u8 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevatio
+     return spriteId;
+ }
+ 
++#if WASM
++static void UpdateHd2dOnlyObjectEvents(void)
++{
++    const s16 left = gSaveBlock1Ptr->pos.x - 2;
++    const s16 right = gSaveBlock1Ptr->pos.x + 17;
++    const s16 top = gSaveBlock1Ptr->pos.y;
++    const s16 bottom = gSaveBlock1Ptr->pos.y + 16;
++
++    for (u32 i = 0; i < OBJECT_EVENTS_COUNT; i++)
++    {
++        struct ObjectEvent *objectEvent = &gObjectEvents[i];
++        const bool32 fromConnectedMap = objectEvent->mapNum != gSaveBlock1Ptr->location.mapNum
++                                     || objectEvent->mapGroup != gSaveBlock1Ptr->location.mapGroup;
++        const bool32 outsideClassicView = objectEvent->currentCoords.x < left
++                                       || objectEvent->currentCoords.x > right
++                                       || objectEvent->currentCoords.y < top
++                                       || objectEvent->currentCoords.y > bottom;
++
++        if (objectEvent->active && !objectEvent->isPlayer
++         && objectEvent->localId < LOCALID_CAMERA)
++            sWasmHdOnlyObjectEvents[i] = WasmHd2dEnabled()
++                                          && (fromConnectedMap || outsideClassicView);
++    }
++}
++
++static void TrySpawnHd2dConnectedObjectEvents(s16 cameraX, s16 cameraY,
++                                               s16 left, s16 right, s16 top, s16 bottom)
++{
++    const struct MapLayout *current = gMapHeader.mapLayout;
++
++    if (!WasmHd2dEnabled() || current == NULL || gMapHeader.connections == NULL)
++        return;
++    for (s32 i = 0; i < gMapHeader.connections->count; i++)
++    {
++        const struct MapConnection *connection = &gMapHeader.connections->connections[i];
++        const struct MapHeader *header = GetMapHeaderFromConnection(connection);
++
++        if (header == NULL || header->mapLayout == NULL || header->events == NULL)
++            continue;
++        for (u32 j = 0; j < header->events->objectEventCount; j++)
++        {
++            const struct ObjectEventTemplate *source = &header->events->objectEvents[j];
++            struct ObjectEventTemplate translated = *source;
++
++            switch (connection->direction)
++            {
++            case CONNECTION_NORTH:
++                translated.x += connection->offset;
++                translated.y -= header->mapLayout->height;
++                break;
++            case CONNECTION_SOUTH:
++                translated.x += connection->offset;
++                translated.y += current->height;
++                break;
++            case CONNECTION_WEST:
++                translated.x -= header->mapLayout->width;
++                translated.y += connection->offset;
++                break;
++            case CONNECTION_EAST:
++                translated.x += current->width;
++                translated.y += connection->offset;
++                break;
++            default:
++                continue;
++            }
++            if (translated.x + MAP_OFFSET < left || translated.x + MAP_OFFSET > right
++             || translated.y + MAP_OFFSET < top || translated.y + MAP_OFFSET > bottom
++             || FlagGet(source->flagId))
++                continue;
++            TrySpawnObjectEventTemplate(&translated, connection->mapNum, connection->mapGroup,
++                                        cameraX, cameraY);
++        }
++    }
++}
++#endif
++
+ void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
+ {
+     u8 i;
++    u8 pass;
++    u8 passCount = 1;
+     u8 objectCount;
+ 
+     if (gMapHeader.events != NULL)
+     {
+-        s16 left = gSaveBlock1Ptr->pos.x - 2;
+-        s16 right = gSaveBlock1Ptr->pos.x + MAP_OFFSET_W + 2;
+-        s16 top = gSaveBlock1Ptr->pos.y;
+-        s16 bottom = gSaveBlock1Ptr->pos.y + MAP_OFFSET_H + 2;
++        const s16 viewLeft = gSaveBlock1Ptr->pos.x - 2;
++        const s16 viewRight = gSaveBlock1Ptr->pos.x + MAP_OFFSET_W + 2;
++        const s16 viewTop = gSaveBlock1Ptr->pos.y;
++        const s16 viewBottom = gSaveBlock1Ptr->pos.y + MAP_OFFSET_H + 2;
++        s16 left = viewLeft;
++        s16 right = viewRight;
++        s16 top = viewTop;
++        s16 bottom = viewBottom;
++#if WASM
++        // The WebGPU world atlas extends beyond the 240x160 GBA viewport.
++        // Keep map entities alive throughout that real overscan area too.
++        if (WasmHd2dEnabled())
++        {
++            left -= 8;
++            right += 8;
++            top -= 6;
++            bottom += 6;
++            passCount = 2;
++        }
++#endif
+ 
+         if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
+             objectCount = GetNumBattlePyramidObjectEvents();
+@@ -1661,16 +1762,32 @@ void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
+         else
+             objectCount = gMapHeader.events->objectEventCount;
+ 
+-        for (i = 0; i < objectCount; i++)
++        // Preserve the original viewport's entities when a dense map has more
++        // templates than free object-event slots. Only after spawning those in
++        // their authored order do we fill remaining slots from the HD overscan.
++        for (pass = 0; pass < passCount; pass++)
+         {
+-            struct ObjectEventTemplate *template = &gSaveBlock1Ptr->objectEventTemplates[i];
+-            s16 npcX = template->x + MAP_OFFSET;
+-            s16 npcY = template->y + MAP_OFFSET;
+-
+-            if (top <= npcY && bottom >= npcY && left <= npcX && right >= npcX
+-                && !FlagGet(template->flagId))
+-                TrySpawnObjectEventTemplate(template, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, cameraX, cameraY);
++            for (i = 0; i < objectCount; i++)
++            {
++                struct ObjectEventTemplate *template = &gSaveBlock1Ptr->objectEventTemplates[i];
++                s16 npcX = template->x + MAP_OFFSET;
++                s16 npcY = template->y + MAP_OFFSET;
++                bool8 inView = viewTop <= npcY && viewBottom >= npcY
++                            && viewLeft <= npcX && viewRight >= npcX;
++                bool8 inOverscan = top <= npcY && bottom >= npcY
++                                && left <= npcX && right >= npcX;
++
++                if (((pass == 0 && inView) || (pass == 1 && !inView && inOverscan))
++                    && !FlagGet(template->flagId))
++                    TrySpawnObjectEventTemplate(template, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, cameraX, cameraY);
++            }
+         }
++#if WASM
++        // Fill any remaining slots with real templates from connected maps so
++        // entities visible in the zoomed atlas do not vanish at map seams.
++        TrySpawnHd2dConnectedObjectEvents(cameraX, cameraY, left, right, top, bottom);
++        UpdateHd2dOnlyObjectEvents();
++#endif
+     }
+ }
+ 
+@@ -1698,10 +1815,28 @@ void RemoveObjectEventsOutsideView(void)
+ 
+ static void RemoveObjectEventIfOutsideView(struct ObjectEvent *objectEvent)
+ {
++#if WASM
++    if (!WasmHd2dEnabled() && objectEvent->localId < LOCALID_CAMERA
++     && sWasmHdOnlyObjectEvents[objectEvent - gObjectEvents])
++    {
++        sWasmHdOnlyObjectEvents[objectEvent - gObjectEvents] = FALSE;
++        RemoveObjectEvent(objectEvent);
++        return;
++    }
++#endif
+     s16 left =   gSaveBlock1Ptr->pos.x - 2;
+     s16 right =  gSaveBlock1Ptr->pos.x + 17;
+     s16 top =    gSaveBlock1Ptr->pos.y;
+     s16 bottom = gSaveBlock1Ptr->pos.y + 16;
++#if WASM
++    if (WasmHd2dEnabled())
++    {
++        left -= 8;
++        right += 8;
++        top -= 6;
++        bottom += 6;
++    }
++#endif
+ 
+     if (objectEvent->currentCoords.x >= left && objectEvent->currentCoords.x <= right
+      && objectEvent->currentCoords.y >= top && objectEvent->currentCoords.y <= bottom)
+@@ -2221,6 +2356,22 @@ void UpdateObjectEventsForCameraUpdate(s16 x, s16 y)
+     RemoveObjectEventsOutsideView();
+ }
+ 
++#if WASM
++void WasmRefreshHd2dObjectEvents(void)
++{
++    s16 cameraX;
++    s16 cameraY;
++
++    if (gMain.callback2 != CB2_Overworld || gMapHeader.events == NULL)
++        return;
++    GetObjectEventMovingCameraOffset(&cameraX, &cameraY);
++    // Remove first when contracting to the classic viewport so those slots are
++    // immediately available to its canonical templates.
++    RemoveObjectEventsOutsideView();
++    TrySpawnObjectEvents(cameraX, cameraY);
++}
++#endif
++
+ // The "CameraObject" functions below are responsible for an invisible sprite
+ // that follows the movements of a different sprite (normally the player's sprite)
+ // and tracks x/y movement distances for the camera so it knows where to move.
+@@ -2334,6 +2485,9 @@ u8 CopySprite(struct Sprite *sprite, s16 x, s16 y, u8 subpriority)
+             gSprites[i].x = x;
+             gSprites[i].y = y;
+             gSprites[i].subpriority = subpriority;
++#if WASM
++            WasmSetSpriteActive(i, gSprites[i].inUse);
++#endif
+             break;
+         }
+     }
+@@ -2352,6 +2506,9 @@ u8 CreateCopySpriteAt(struct Sprite *sprite, s16 x, s16 y, u8 subpriority)
+             gSprites[i].x = x;
+             gSprites[i].y = y;
+             gSprites[i].subpriority = subpriority;
++#if WASM
++            WasmSetSpriteActive(i, gSprites[i].inUse);
++#endif
+             return i;
+         }
+     }
+@@ -4933,7 +5090,12 @@ void UpdateObjectEventCurrentMovement(struct ObjectEvent *objectEvent, struct Sp
+ 
+     if (ObjectEventIsHeldMovementActive(objectEvent))
+         ObjectEventExecHeldMovementAction(objectEvent, sprite);
+-    else if (!objectEvent->frozen)
++    else if (!objectEvent->frozen
++#if WASM
++          && !(WasmHd2dEnabled() && objectEvent->localId < LOCALID_CAMERA
++            && sWasmHdOnlyObjectEvents[objectEvent - gObjectEvents])
++#endif
++    )
+         while (callback(objectEvent, sprite));
+ 
+     DoGroundEffects_OnBeginStep(objectEvent, sprite);
+@@ -7372,11 +7534,25 @@ static void UpdateObjectEventOffscreen(struct ObjectEvent *objectEvent, struct S
+     y2 = y;
+     y2 += graphicsInfo->height;
+ 
+-    if ((s16)x >= DISPLAY_WIDTH + 16 || (s16)x2 < -16)
+-        objectEvent->offScreen = TRUE;
++#if WASM
++    if (WasmHd2dEnabled())
++    {
++        const s16 marginX = (WasmWorldWidth() - DISPLAY_WIDTH) / 2;
++        const s16 marginY = (WasmWorldHeight() - DISPLAY_HEIGHT) / 2;
+ 
+-    if ((s16)y >= DISPLAY_HEIGHT + 16 || (s16)y2 < -16)
+-        objectEvent->offScreen = TRUE;
++        if ((s16)x >= DISPLAY_WIDTH + marginX + 16 || (s16)x2 < -marginX - 16)
++            objectEvent->offScreen = TRUE;
++        if ((s16)y >= DISPLAY_HEIGHT + marginY + 16 || (s16)y2 < -marginY - 16)
++            objectEvent->offScreen = TRUE;
++    }
++    else
++#endif
++    {
++        if ((s16)x >= DISPLAY_WIDTH + 16 || (s16)x2 < -16)
++            objectEvent->offScreen = TRUE;
++        if ((s16)y >= DISPLAY_HEIGHT + 16 || (s16)y2 < -16)
++            objectEvent->offScreen = TRUE;
++    }
+ }
+ 
+ static void UpdateObjectEventSpriteVisibility(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+diff --git a/src/field_effect_helpers.c b/src/field_effect_helpers.c
+index a5320be4..3569158d 100755
+--- a/src/field_effect_helpers.c
++++ b/src/field_effect_helpers.c
+@@ -128,6 +128,9 @@ static void UpdateObjectReflectionSprite(struct Sprite *reflectionSprite)
+     if (!objectEvent->active || !objectEvent->hasReflection || objectEvent->localId != reflectionSprite->sReflectionObjEventLocalId)
+     {
+         reflectionSprite->inUse = FALSE;
++#if WASM
++        WasmSetSpriteActive(reflectionSprite - gSprites, FALSE);
++#endif
+     }
+     else
+     {
+diff --git a/src/field_player_avatar.c b/src/field_player_avatar.c
+index b000cf63..5b1359e3 100644
+--- a/src/field_player_avatar.c
++++ b/src/field_player_avatar.c
+@@ -38,7 +38,11 @@ EWRAM_DATA struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT] = {};
+ EWRAM_DATA struct PlayerAvatar gPlayerAvatar = {};
+ 
+ // static declarations
++#if WASM
++static bool8 ObjectEventCB2_NoMovement2(struct ObjectEvent *, struct Sprite *);
++#else
+ static u8 ObjectEventCB2_NoMovement2(void);
++#endif
+ static bool8 TryInterruptObjectEventSpecialAnim(struct ObjectEvent *, u8);
+ static void npc_clear_strange_bits(struct ObjectEvent *);
+ static void MovePlayerAvatarUsingKeypadInput(u8, u16, u16);
+@@ -321,13 +325,24 @@ static bool8 (*const sPlayerAvatarSecretBaseMatSpin[])(struct Task *, struct Obj
+ 
+ void MovementType_Player(struct Sprite *sprite)
+ {
++#if WASM
++    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, ObjectEventCB2_NoMovement2);
++#else
+     UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, (bool8 (*)(struct ObjectEvent *, struct Sprite *))ObjectEventCB2_NoMovement2);
++#endif
+ }
+ 
++#if WASM
++static bool8 ObjectEventCB2_NoMovement2(struct ObjectEvent *objectEvent, struct Sprite *sprite)
++{
++    return FALSE;
++}
++#else
+ static u8 ObjectEventCB2_NoMovement2(void)
+ {
+     return 0;
+ }
++#endif
+ 
+ void PlayerStep(u8 direction, u16 newKeys, u16 heldKeys)
+ {
+diff --git a/src/field_poison.c b/src/field_poison.c
+index 1b8ae940..4d4c96f3 100644
+--- a/src/field_poison.c
++++ b/src/field_poison.c
+@@ -16,6 +16,9 @@
+ #include "trainer_hill.h"
+ #include "constants/field_poison.h"
+ #include "constants/party_menu.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ 
+ static bool32 IsMonValidSpecies(struct Pokemon *pokemon)
+ {
+@@ -102,6 +105,9 @@ static void Task_TryFieldPoisonWhiteOut(u8 taskId)
+         {
+             gSpecialVar_Result = FLDPSN_NO_WHITEOUT;
+         }
++#if WASM
++        WasmRunProcessSafePoint(0);
++#endif
+         ScriptContext_Enable();
+         DestroyTask(taskId);
+         break;
+diff --git a/src/field_specials.c b/src/field_specials.c
+index b4911f0a..53543c58 100644
+--- a/src/field_specials.c
++++ b/src/field_specials.c
+@@ -21,6 +21,7 @@
+ #include "item_icon.h"
+ #include "link.h"
+ #include "list_menu.h"
++#include "load_save.h"
+ #include "main.h"
+ #include "mystery_gift.h"
+ #include "match_call.h"
+@@ -1423,6 +1424,7 @@ void SetShoalItemFlag(u16 unused)
+ void LoadWallyZigzagoon(void)
+ {
+     u16 monData;
++    BackupPlayerPartyForWallyTutorial();
+     CreateMon(&gPlayerParty[0], SPECIES_ZIGZAGOON, 7, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
+     monData = TRUE;
+     SetMonData(&gPlayerParty[0], MON_DATA_ABILITY_NUM, &monData);
+diff --git a/src/gpu_regs.c b/src/gpu_regs.c
+index d645c144..139de93d 100644
+--- a/src/gpu_regs.c
++++ b/src/gpu_regs.c
+@@ -13,11 +13,29 @@ static u8 sGpuRegWaitingList[GPU_REG_BUF_SIZE];
+ static volatile bool8 sGpuRegBufferLocked;
+ static volatile bool8 sShouldSyncRegIE;
+ static vu16 sRegIE;
++#if WASM
++static u8 sGpuRegWaitingCount;
++static u32 sGpuRegWaitingBits[3];
++#endif
+ 
+ static void CopyBufferedValueToGpuReg(u8 regOffset);
+ static void SyncRegIE(void);
+ static void UpdateRegDispstatIntrBits(u16 regIE);
+ 
++#if WASM
++static void QueueGpuReg(u8 regOffset)
++{
++    u32 index = regOffset >> 5;
++    u32 bit = 1u << (regOffset & 31);
++
++    if (!(sGpuRegWaitingBits[index] & bit))
++    {
++        sGpuRegWaitingBits[index] |= bit;
++        sGpuRegWaitingList[sGpuRegWaitingCount++] = regOffset;
++    }
++}
++#endif
++
+ void InitGpuRegManager(void)
+ {
+     s32 i;
+@@ -31,6 +49,12 @@ void InitGpuRegManager(void)
+     sGpuRegBufferLocked = FALSE;
+     sShouldSyncRegIE = FALSE;
+     sRegIE = 0;
++#if WASM
++    sGpuRegWaitingCount = 0;
++    sGpuRegWaitingBits[0] = 0;
++    sGpuRegWaitingBits[1] = 0;
++    sGpuRegWaitingBits[2] = 0;
++#endif
+ }
+ 
+ static void CopyBufferedValueToGpuReg(u8 regOffset)
+@@ -52,6 +76,17 @@ void CopyBufferedValuesToGpuRegs(void)
+     {
+         s32 i;
+ 
++#if WASM
++        for (i = 0; i < sGpuRegWaitingCount; i++)
++        {
++            u8 regOffset = sGpuRegWaitingList[i];
++            CopyBufferedValueToGpuReg(regOffset);
++        }
++        sGpuRegWaitingCount = 0;
++        sGpuRegWaitingBits[0] = 0;
++        sGpuRegWaitingBits[1] = 0;
++        sGpuRegWaitingBits[2] = 0;
++#else
+         for (i = 0; i < GPU_REG_BUF_SIZE; i++)
+         {
+             u8 regOffset = sGpuRegWaitingList[i];
+@@ -60,6 +95,7 @@ void CopyBufferedValuesToGpuRegs(void)
+             CopyBufferedValueToGpuReg(regOffset);
+             sGpuRegWaitingList[i] = EMPTY_SLOT;
+         }
++#endif
+     }
+ }
+ 
+@@ -82,6 +118,10 @@ void SetGpuReg(u8 regOffset, u16 value)
+ 
+             sGpuRegBufferLocked = TRUE;
+ 
++#if WASM
++            QueueGpuReg(regOffset);
++            sGpuRegBufferLocked = FALSE;
++#else
+             for (i = 0; i < GPU_REG_BUF_SIZE && sGpuRegWaitingList[i] != EMPTY_SLOT; i++)
+             {
+                 if (sGpuRegWaitingList[i] == regOffset)
+@@ -93,6 +133,7 @@ void SetGpuReg(u8 regOffset, u16 value)
+ 
+             sGpuRegWaitingList[i] = regOffset;
+             sGpuRegBufferLocked = FALSE;
++#endif
+         }
+     }
+ }
+@@ -113,6 +154,10 @@ void SetGpuReg_ForcedBlank(u8 regOffset, u16 value)
+ 
+             sGpuRegBufferLocked = TRUE;
+ 
++#if WASM
++            QueueGpuReg(regOffset);
++            sGpuRegBufferLocked = FALSE;
++#else
+             for (i = 0; i < GPU_REG_BUF_SIZE && sGpuRegWaitingList[i] != EMPTY_SLOT; i++)
+             {
+                 if (sGpuRegWaitingList[i] == regOffset)
+@@ -124,6 +169,7 @@ void SetGpuReg_ForcedBlank(u8 regOffset, u16 value)
+ 
+             sGpuRegWaitingList[i] = regOffset;
+             sGpuRegBufferLocked = FALSE;
++#endif
+         }
+     }
+ }
+diff --git a/src/intro.c b/src/intro.c
+index 71393100..572a78ba 100644
+--- a/src/intro.c
++++ b/src/intro.c
+@@ -1148,7 +1148,11 @@ void CB2_InitCopyrightScreenAfterBootup(void)
+ {
+     if (!SetUpCopyrightScreen())
+     {
++#if WASM
++        SetSaveBlocksPointers(0);
++#else
+         SetSaveBlocksPointers(GetSaveBlocksPointersBaseOffset());
++#endif
+         ResetMenuAndMonGlobals();
+         Save_ResetSaveCounters();
+         LoadGameSave(SAVE_NORMAL);
+diff --git a/src/link.c b/src/link.c
+index fe1c13f6..a60d0de8 100644
+--- a/src/link.c
++++ b/src/link.c
+@@ -236,6 +236,9 @@ static const u8 sUnusedData[] = {0x00, 0xFF, 0xFE, 0xFF, 0x00};
+ 
+ bool8 IsWirelessAdapterConnected(void)
+ {
++#if WASM
++    return FALSE;
++#else
+     SetWirelessCommType1();
+     InitRFUAPI();
+     if (rfu_LMAN_REQBN_softReset_and_checkID() == RFU_ID)
+@@ -248,6 +251,7 @@ bool8 IsWirelessAdapterConnected(void)
+     CloseLink();
+     RestoreSerialTimer3IntrHandlers();
+     return FALSE;
++#endif
+ }
+ 
+ void Task_DestroySelf(u8 taskId)
+diff --git a/src/load_save.c b/src/load_save.c
+index 117ba3e2..3dc1247e 100644
+--- a/src/load_save.c
++++ b/src/load_save.c
+@@ -35,6 +35,9 @@ EWRAM_DATA struct PokemonStorageASLR gPokemonStorage = {0};
+ 
+ EWRAM_DATA struct LoadedSaveData gLoadedSaveData = {0};
+ EWRAM_DATA u32 gLastEncryptionKey = 0;
++static EWRAM_DATA struct Pokemon sWallySavedSlot0 = {0};
++static EWRAM_DATA u8 sWallySavedPartyCount = 0;
++static EWRAM_DATA bool8 sWallyTutorialPartyActive = FALSE;
+ 
+ // IWRAM common
+ COMMON_DATA bool32 gFlashMemoryPresent = 0;
+@@ -63,6 +66,7 @@ void ClearSav2(void)
+ 
+ void ClearSav1(void)
+ {
++    ClearWallyTutorialPartyBackup();
+     CpuFill16(0, &gSaveblock1, sizeof(struct SaveBlock1ASLR));
+ }
+ 
+@@ -157,6 +161,38 @@ void ClearContinueGameWarpStatus2(void)
+     gSaveBlock2Ptr->specialSaveWarpFlags &= ~CONTINUE_GAME_WARP;
+ }
+ 
++void ClearWallyTutorialPartyBackup(void)
++{
++    sWallyTutorialPartyActive = FALSE;
++    sWallySavedPartyCount = 0;
++    ZeroMonData(&sWallySavedSlot0);
++}
++
++void BackupPlayerPartyForWallyTutorial(void)
++{
++    if (!sWallyTutorialPartyActive)
++    {
++        sWallySavedSlot0 = gPlayerParty[0];
++        sWallySavedPartyCount = gPlayerPartyCount;
++        sWallyTutorialPartyActive = TRUE;
++    }
++}
++
++bool8 IsWallyTutorialPartyActive(void)
++{
++    return sWallyTutorialPartyActive;
++}
++
++struct Pokemon *GetWallyTutorialSavedSlot0(void)
++{
++    return &sWallySavedSlot0;
++}
++
++u8 GetWallyTutorialSavedPartyCount(void)
++{
++    return sWallySavedPartyCount;
++}
++
+ void SavePlayerParty(void)
+ {
+     int i;
+@@ -165,12 +201,29 @@ void SavePlayerParty(void)
+ 
+     for (i = 0; i < PARTY_SIZE; i++)
+         gSaveBlock1Ptr->playerParty[i] = gPlayerParty[i];
++
++    // If a save happens while Wally's tutorial Zigzagoon occupies gPlayerParty[0],
++    // never overwrite the player's backed-up slot 0 in SaveBlock1.
++    if (sWallyTutorialPartyActive)
++    {
++        gSaveBlock1Ptr->playerParty[0] = sWallySavedSlot0;
++        if (sWallySavedPartyCount > 0)
++            gSaveBlock1Ptr->playerPartyCount = sWallySavedPartyCount;
++    }
+ }
+ 
+ void LoadPlayerParty(void)
+ {
+     int i;
+ 
++    if (sWallyTutorialPartyActive)
++    {
++        gSaveBlock1Ptr->playerParty[0] = sWallySavedSlot0;
++        if (sWallySavedPartyCount > 0)
++            gSaveBlock1Ptr->playerPartyCount = sWallySavedPartyCount;
++        ClearWallyTutorialPartyBackup();
++    }
++
+     gPlayerPartyCount = gSaveBlock1Ptr->playerPartyCount;
+ 
+     for (i = 0; i < PARTY_SIZE; i++)
+@@ -201,6 +254,7 @@ void CopyPartyAndObjectsToSave(void)
+ 
+ void CopyPartyAndObjectsFromSave(void)
+ {
++    ClearWallyTutorialPartyBackup();
+     LoadPlayerParty();
+     LoadObjectEvents();
+ }
+diff --git a/src/m4a.c b/src/m4a.c
+index 1a2d5418..0cb1fc70 100644
+--- a/src/m4a.c
++++ b/src/m4a.c
+@@ -1,5 +1,13 @@
+ #include "global.h"
+ #include "gba/m4a_internal.h"
++#include "constants/songs.h"
++
++#if WASM
++#undef NUM_MUSIC_PLAYERS
++#undef MAX_LINES
++#define NUM_MUSIC_PLAYERS 4
++#define MAX_LINES 0
++#endif
+ 
+ extern const u8 gCgb3Vol[];
+ 
+@@ -71,7 +79,9 @@ void m4aSoundInit(void)
+ {
+     s32 i;
+ 
++#if !WASM
+     CpuCopy32((void *)((s32)SoundMainRAM & ~1), SoundMainRAM_Buffer, sizeof(SoundMainRAM_Buffer));
++#endif
+ 
+     SoundInit(&gSoundInfo);
+     MPlayExtender(gCgbChans);
+@@ -327,27 +337,37 @@ void MPlayExtender(struct CgbChannel *cgbChans)
+ 
+ static void UNUSED MusicPlayerJumpTableCopy(void)
+ {
++#if !WASM
+     asm("swi 0x2A");
++#endif
+ }
+ 
+ void ClearChain(void *x)
+ {
++#if WASM
++    RealClearChain(x);
++#else
+ #if __STDC_VERSION__ < 202311L
+     void (*func)(void *) = *(&gMPlayJumpTable[34]);
+ #else
+     void (*func)(...) = *(&gMPlayJumpTable[34]);
+ #endif
+     func(x);
++#endif
+ }
+ 
+ void Clear64byte(void *x)
+ {
++#if WASM
++    CpuFill32(0, x, 64);
++#else
+ #if __STDC_VERSION__ < 202311L
+     void (*func)(void *) = *(&gMPlayJumpTable[35]);
+ #else
+     void (*func)(...) = *(&gMPlayJumpTable[35]);
+ #endif
+     func(x);
++#endif
+ }
+ 
+ void SoundInit(struct SoundInfo *soundInfo)
+@@ -420,11 +440,13 @@ void SampleFreqSet(u32 freq)
+ 
+     m4aSoundVSyncOn();
+ 
++#if !WASM
+     while (*(vu8 *)REG_ADDR_VCOUNT == 159)
+         ;
+ 
+     while (*(vu8 *)REG_ADDR_VCOUNT != 159)
+         ;
++#endif
+ 
+     REG_TM0CNT_H = TIMER_ENABLE | TIMER_1CLK;
+ }
+@@ -1511,8 +1533,12 @@ void ply_memacc(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *trac
+ 
+ cond_true:
+     {
++#if WASM
++        ply_goto(mplayInfo, track);
++#else
+         // *& is required for matching
+         (*&gMPlayJumpTable[1])(mplayInfo, track);
++#endif
+         return;
+     }
+ 
+@@ -1530,7 +1556,11 @@ void ply_xcmd(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track)
+ 
+ void ply_xxx(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track)
+ {
++#if WASM
++    ply_fine(mplayInfo, track);
++#else
+     gMPlayJumpTable[0](mplayInfo, track);
++#endif
+ }
+ 
+ #define READ_XCMD_BYTE(var, n)       \
+diff --git a/src/main.c b/src/main.c
+index 2a47ec51..6b58d74b 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -56,6 +56,9 @@ const IntrFunc gIntrTableTemplate[] =
+ };
+ 
+ #define INTR_COUNT ((int)(sizeof(gIntrTableTemplate)/sizeof(IntrFunc)))
++#if WASM
++#define GBA_CYCLES_PER_FRAME 280896
++#endif
+ 
+ static u16 sUnusedVar; // Never read
+ 
+@@ -76,6 +79,10 @@ static EWRAM_DATA u16 sTrainerId = 0;
+ static void UpdateLinkAndCallCallbacks(void);
+ static void InitMainCallbacks(void);
+ static void CallCallbacks(void);
++#if WASM
++void WasmRunFrame(void);
++void WasmDmaStop0(void);
++#endif
+ #ifdef BUGFIX
+ static void SeedRngWithRtc(void);
+ #endif
+@@ -98,11 +105,16 @@ void AgbMain(void)
+     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3;
+     InitKeys();
+     InitIntrHandlers();
++#if WASM
++    m4aSoundInit();
++    gFlashMemoryPresent = TRUE;
++#else
+     m4aSoundInit();
+     EnableVCountIntrAtLine150();
+     InitRFU();
+     RtcInit();
+     CheckForFlashMemory();
++#endif
+     InitMainCallbacks();
+     InitMapMusic();
+ #ifdef BUGFIX
+@@ -128,44 +140,92 @@ void AgbMain(void)
+     AGBPrintInit();
+ #endif
+ #endif
++#if WASM
++    return;
++#else
+     for (;;)
++        WasmRunFrame();
++#endif
++}
++
++#if WASM
++void WasmDmaStop0(void)
++{
++    DmaStop(0);
++}
++
++void WasmBeginScanlineGpuRegs(void);
++void WasmCaptureScanlineGpuRegs(u32 line);
++void WasmEndScanlineGpuRegs(void);
++void WasmClearScanlineGpuRegs(void);
++
++// The browser draws the whole frame after VBlank, so run the HBlank callback
++// for each visible line up front and let the renderer read the registers each
++// line starts with. The live registers keep their VBlank state afterward.
++static void RunHBlankLines(void)
++{
++    if (!REG_IME
++     || !(REG_IE & INTR_FLAG_HBLANK)
++     || !(REG_DISPSTAT & DISPSTAT_HBLANK_INTR)
++     || gMain.hblankCallback == NULL)
+     {
+-        ReadKeys();
++        WasmClearScanlineGpuRegs();
++        return;
++    }
+ 
+-        if (gSoftResetDisabled == FALSE
+-         && JOY_HELD_RAW(A_BUTTON)
+-         && JOY_HELD_RAW(B_START_SELECT) == B_START_SELECT)
+-        {
+-            rfu_REQ_stopMode();
+-            rfu_waitREQComplete();
+-            DoSoftReset();
+-        }
++    WasmBeginScanlineGpuRegs();
++    for (u32 line = 0; line < DISPLAY_HEIGHT; line++)
++    {
++        REG_VCOUNT = line;
++        HBlankIntr();
++        WasmCaptureScanlineGpuRegs(line + 1);
++    }
++    WasmEndScanlineGpuRegs();
++}
++#endif
++
++void WasmRunFrame(void)
++{
++    ReadKeys();
++
++    if (gSoftResetDisabled == FALSE
++     && JOY_HELD_RAW(A_BUTTON)
++     && JOY_HELD_RAW(B_START_SELECT) == B_START_SELECT)
++    {
++        rfu_REQ_stopMode();
++        rfu_waitREQComplete();
++        DoSoftReset();
++    }
+ 
+-        if (Overworld_SendKeysToLinkIsRunning() == TRUE)
++    if (Overworld_SendKeysToLinkIsRunning() == TRUE)
++    {
++        gLinkTransferringData = TRUE;
++        UpdateLinkAndCallCallbacks();
++        gLinkTransferringData = FALSE;
++    }
++    else
++    {
++        gLinkTransferringData = FALSE;
++        UpdateLinkAndCallCallbacks();
++
++        if (Overworld_RecvKeysFromLinkIsRunning() == TRUE)
+         {
++            gMain.newKeys = 0;
++            ClearSpriteCopyRequests();
+             gLinkTransferringData = TRUE;
+             UpdateLinkAndCallCallbacks();
+             gLinkTransferringData = FALSE;
+         }
+-        else
+-        {
+-            gLinkTransferringData = FALSE;
+-            UpdateLinkAndCallCallbacks();
+-
+-            if (Overworld_RecvKeysFromLinkIsRunning() == TRUE)
+-            {
+-                gMain.newKeys = 0;
+-                ClearSpriteCopyRequests();
+-                gLinkTransferringData = TRUE;
+-                UpdateLinkAndCallCallbacks();
+-                gLinkTransferringData = FALSE;
+-            }
+-        }
+-
+-        PlayTimeCounter_Update();
+-        MapMusicMain();
+-        WaitForVBlank();
+     }
++
++    PlayTimeCounter_Update();
++    MapMusicMain();
++#if WASM
++    VBlankIntr();
++    RunHBlankLines();
++#else
++    WaitForVBlank();
++#endif
+ }
+ 
+ static void UpdateLinkAndCallCallbacks(void)
+@@ -339,6 +399,13 @@ void SetSerialCallback(IntrCallback callback)
+ 
+ static void VBlankIntr(void)
+ {
++#if WASM
++    // Hardware timers advance independently on GBA. Approximate Timer 1 at
++    // frame boundaries so timing-based RNG seeds still vary with user input.
++    if (REG_TM1CNT_H & TIMER_ENABLE)
++        REG_TM1CNT_L = (u16)(REG_TM1CNT_L + GBA_CYCLES_PER_FRAME);
++#endif
++
+     if (gWirelessCommType != 0)
+         RfuVSync();
+     else if (gLinkVSyncDisabled == FALSE)
+@@ -357,9 +424,18 @@ static void VBlankIntr(void)
+     CopyBufferedValuesToGpuRegs();
+     ProcessDma3Requests();
+ 
++#if WASM
++    m4aSoundVSync();
++#endif
+     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
+ 
+     m4aSoundMain();
++#if WASM
++    {
++        extern void WasmAudioRenderFrame(void);
++        WasmAudioRenderFrame();
++    }
++#endif
+     TryReceiveLinkBattleData();
+ 
+     if (!gMain.inBattle || !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_RECORDED)))
+diff --git a/src/menu.c b/src/menu.c
+index 1de324c9..9424858c 100644
+--- a/src/menu.c
++++ b/src/menu.c
+@@ -1767,6 +1767,11 @@ bool8 FreeTempTileDataBuffersIfPossible(void)
+ {
+     int i;
+ 
++#if WASM
++    if (IsDma3ManagerBusyWithBgCopy())
++        ProcessDma3Requests();
++#endif
++
+     if (!IsDma3ManagerBusyWithBgCopy())
+     {
+         if (sTempTileDataBufferIdx)
+diff --git a/src/naming_screen.c b/src/naming_screen.c
+index ca3be258..3ed1ff41 100644
+--- a/src/naming_screen.c
++++ b/src/naming_screen.c
+@@ -2008,6 +2008,10 @@ static void PrintControls(void)
+ static void CB2_NamingScreen(void)
+ {
+     RunTasks();
++#if WASM
++    if (sNamingScreen == NULL)
++        return;
++#endif
+     AnimateSprites();
+     BuildOamBuffer();
+     UpdatePaletteFade();
+diff --git a/src/overworld.c b/src/overworld.c
+index 05f5bc5f..8617dfb9 100644
+--- a/src/overworld.c
++++ b/src/overworld.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "battle.h"
+ #include "overworld.h"
+ #include "battle_pyramid.h"
+ #include "battle_setup.h"
+@@ -63,6 +64,9 @@
+ #include "constants/layouts.h"
+ #include "constants/map_types.h"
+ #include "constants/region_map_sections.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "constants/songs.h"
+ #include "constants/trainer_hill.h"
+ #include "constants/weather.h"
+@@ -357,6 +361,11 @@ static void (*const sMovementStatusHandler[])(struct LinkPlayerObjectEvent *, st
+ // code
+ void DoWhiteOut(void)
+ {
++#if WASM
++    // Run-dead Pokémon must be removed before vanilla whiteout healing revives
++    // the player's party.
++    WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+     RunScriptImmediately(EventScript_WhiteOut);
+     SetMoney(&gSaveBlock1Ptr->money, GetMoney(&gSaveBlock1Ptr->money) / 2);
+     HealPlayerParty();
+@@ -1556,6 +1565,9 @@ void CB2_WhiteOut(void)
+         FieldClearVBlankHBlankCallbacks();
+         StopMapMusic();
+         ResetSafariZoneFlag_();
++#if WASM
++        WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+         DoWhiteOut();
+         ResetInitialPlayerAvatarState();
+         ScriptContext_Init();
+@@ -1639,6 +1651,9 @@ static void CB2_ReturnToFieldLocal(void)
+ {
+     if (ReturnToFieldLocal(&gMain.state))
+     {
++#if WASM
++        WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+         SetFieldVBlankCallback();
+         SetMainCallback2(CB2_Overworld);
+     }
+@@ -1647,7 +1662,12 @@ static void CB2_ReturnToFieldLocal(void)
+ static void CB2_ReturnToFieldLink(void)
+ {
+     if (!Overworld_IsRecvQueueAtMax() && ReturnToFieldLink(&gMain.state))
++    {
++#if WASM
++        WasmRunProcessSafePoint(gBattleOutcome);
++#endif
+         SetMainCallback2(CB2_Overworld);
++    }
+ }
+ 
+ void CB2_ReturnToFieldFromMultiplayer(void)
+diff --git a/src/party_menu.c b/src/party_menu.c
+index 66248f2b..5276f99d 100755
+--- a/src/party_menu.c
++++ b/src/party_menu.c
+@@ -12,6 +12,7 @@
+ #include "contest.h"
+ #include "data.h"
+ #include "decompress.h"
++#include "dma3.h"
+ #include "easy_chat.h"
+ #include "event_data.h"
+ #include "evolution_scene.h"
+@@ -47,6 +48,9 @@
+ #include "pokemon_icon.h"
+ #include "pokemon_jump.h"
+ #include "pokemon_storage_system.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "pokemon_summary_screen.h"
+ #include "region_map.h"
+ #include "reshow_battle_screen.h"
+@@ -740,6 +744,10 @@ static bool8 AllocPartyMenuBgGfx(void)
+         sPartyMenuInternal->data[0]++;
+         break;
+     case 1:
++#if WASM
++        if (IsDma3ManagerBusyWithBgCopy())
++            ProcessDma3Requests();
++#endif
+         if (!IsDma3ManagerBusyWithBgCopy())
+         {
+             LZDecompressWram(gPartyMenuBg_Tilemap, sPartyBgTilemapBuffer);
+@@ -5005,6 +5013,9 @@ void ItemUseCB_RareCandy(u8 taskId, TaskFunc task)
+         PlayFanfareByFanfareNum(FANFARE_LEVEL_UP);
+         UpdateMonDisplayInfoAfterRareCandy(gPartyMenu.slotId, mon);
+         RemoveBagItem(gSpecialVar_ItemId, 1);
++#if WASM
++        WasmRunRefillRareCandy();
++#endif
+         GetMonNickname(mon, gStringVar1);
+         ConvertIntToDecimalStringN(gStringVar2, GetMonData(mon, MON_DATA_LEVEL), STR_CONV_MODE_LEFT_ALIGN, 3);
+         StringExpandPlaceholders(gStringVar4, gText_PkmnElevatedToLvVar2);
+diff --git a/src/pokemon.c b/src/pokemon.c
+index 9c9c223c..5051de48 100644
+--- a/src/pokemon.c
++++ b/src/pokemon.c
+@@ -25,6 +25,9 @@
+ #include "pokemon_animation.h"
+ #include "pokemon_summary_screen.h"
+ #include "pokemon_storage_system.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "random.h"
+ #include "recorded_battle.h"
+ #include "rtc.h"
+@@ -2299,6 +2302,14 @@ void CreateBoxMon(struct BoxPokemon *boxMon, u16 species, u8 level, u8 fixedIV,
+         SetBoxMonData(boxMon, MON_DATA_ABILITY_NUM, &value);
+     }
+ 
++#if WASM
++    if (species == SPECIES_MEW || species == SPECIES_DEOXYS)
++    {
++        bool32 isModernFatefulEncounter = TRUE;
++        SetBoxMonData(boxMon, MON_DATA_MODERN_FATEFUL_ENCOUNTER, &isModernFatefulEncounter);
++    }
++#endif
++
+     GiveBoxMonInitialMoveset(boxMon);
+ }
+ 
+@@ -3707,7 +3718,14 @@ u32 GetMonData3(struct Pokemon *mon, s32 field, u8 *data)
+     return ret;
+ }
+ 
++#if WASM
++u32 GetMonData2(struct Pokemon *mon, s32 field)
++{
++    return GetMonData3(mon, field, NULL);
++}
++#else
+ u32 GetMonData2(struct Pokemon *mon, s32 field) __attribute__((alias("GetMonData3")));
++#endif
+ 
+ /* GameFreak called GetBoxMonData with either 2 or 3 arguments, for type
+  * safety we have a GetBoxMonData macro (in include/pokemon.h) which
+@@ -4069,7 +4087,14 @@ u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
+     return retVal;
+ }
+ 
++#if WASM
++u32 GetBoxMonData2(struct BoxPokemon *boxMon, s32 field)
++{
++    return GetBoxMonData3(boxMon, field, NULL);
++}
++#else
+ u32 GetBoxMonData2(struct BoxPokemon *boxMon, s32 field) __attribute__((alias("GetBoxMonData3")));
++#endif
+ 
+ #define SET8(lhs) (lhs) = *data
+ #define SET16(lhs) (lhs) = data[0] + (data[1] << 8)
+@@ -4812,6 +4837,22 @@ bool8 PokemonUseItemEffects(struct Pokemon *mon, u16 item, u8 partyIndex, u8 mov
+         itemEffect = gItemEffectTable[item - ITEM_POTION];
+     }
+ 
++#if WASM
++    if ((item == ITEM_REVIVE || item == ITEM_MAX_REVIVE || item == ITEM_SACRED_ASH
++         || item == ITEM_RARE_CANDY)
++        && !WasmRunAllowItemEffect(
++            GetMonData(mon, MON_DATA_SPECIES, NULL),
++            GetMonData(mon, MON_DATA_PERSONALITY, NULL) & 0xffff,
++            GetMonData(mon, MON_DATA_PERSONALITY, NULL) >> 16,
++            item,
++            GetMonData(mon, MON_DATA_HP, NULL),
++            GetMonData(mon, MON_DATA_LEVEL, NULL),
++            WasmRunHighestLivingPartyLevel(),
++            WasmRunGymLevelCap(),
++            item == ITEM_RARE_CANDY))
++        return TRUE;
++#endif
++
+     // Do item effect
+     for (i = 0; i < ITEM_EFFECT_ARG_START; i++)
+     {
+diff --git a/src/pokemon_animation.c b/src/pokemon_animation.c
+index 8058074e..83c2ef13 100644
+--- a/src/pokemon_animation.c
++++ b/src/pokemon_animation.c
+@@ -1638,35 +1638,33 @@ static void Anim_VerticalStretch(struct Sprite *sprite)
+ static void VerticalShakeTwice(struct Sprite *sprite)
+ {
+     u8 index = sprite->data[2];
+-    u8 var7 = sprite->data[6];
+-    u8 var5 = sVerticalShakeData[sprite->data[5]][0];
+-    u8 var6 = sVerticalShakeData[sprite->data[5]][1];
+-    u8 amplitude = 0;
++    u8 timer = sprite->data[6];
++    u8 amplitude = sVerticalShakeData[sprite->data[5]][0];
++    u8 duration = sVerticalShakeData[sprite->data[5]][1];
+ 
+-    if (var5 != (u8)-2)
+-        amplitude = (var6 - var7) * var5 / var6;
++    if (amplitude == (u8)-1)
++    {
++        sprite->callback = WaitAnimEnd;
++        sprite->y2 = 0;
++        return;
++    }
++
++    if (amplitude != (u8)-2)
++        amplitude = (duration - timer) * amplitude / duration;
+     else
+         amplitude = 0;
+ 
+-    if (var5 == (u8)-1)
++    sprite->y2 = Sin(index, amplitude);
++
++    if (timer == duration)
+     {
+-        sprite->callback = WaitAnimEnd;
+-        sprite->y2 = 0;
++        sprite->data[5]++;
++        sprite->data[6] = 0;
+     }
+     else
+     {
+-        sprite->y2 = Sin(index, amplitude);
+-
+-        if (var7 == var6)
+-        {
+-            sprite->data[5]++;
+-            sprite->data[6] = 0;
+-        }
+-        else
+-        {
+-            sprite->data[2] += sprite->data[0];
+-            sprite->data[6]++;
+-        }
++        sprite->data[2] += sprite->data[0];
++        sprite->data[6]++;
+     }
+ }
+ 
+@@ -4063,38 +4061,34 @@ static void Anim_HorizontalStretchFar_Slow(struct Sprite *sprite)
+ 
+ static void VerticalShakeLowTwice(struct Sprite *sprite)
+ {
+-    u8 var6, var7;
+-    u8 var8 = sprite->data[2];
+-    u8 var9 = sprite->data[6];
+-    u8 var5 = sVerticalShakeData[sprite->data[5]][0];
+-    if (var5 != (u8)-1)
+-        var5 = sprite->data[7];
+-
+-    var6 = sVerticalShakeData[sprite->data[5]][1];
+-    var7 = 0;
+-    if (sVerticalShakeData[sprite->data[5]][0] != (u8)-2)
+-        var7 = (var6 - var9) * var5 / var6;
+-    else
+-        var7 = 0;
++    u8 index = sprite->data[2];
++    u8 timer = sprite->data[6];
++    u8 phase = sVerticalShakeData[sprite->data[5]][0];
++    u8 duration = sVerticalShakeData[sprite->data[5]][1];
++    u8 amplitude;
+ 
+-    if (var5 == (u8)-1)
++    if (phase == (u8)-1)
+     {
+         sprite->callback = WaitAnimEnd;
+         sprite->y2 = 0;
++        return;
+     }
++
++    if (phase != (u8)-2)
++        amplitude = (duration - timer) * sprite->data[7] / duration;
+     else
++        amplitude = 0;
++
++    sprite->y2 = Sin((index + 192) % 256, amplitude) + amplitude;
++    if (timer == duration)
+     {
+-        sprite->y2 = Sin((var8 + 192) % 256, var7) + var7;
+-        if (var9 == var6)
+-        {
+-            sprite->data[5]++;
+-            sprite->data[6] = 0;
+-        }
+-        else
+-        {
+-            sprite->data[2] += sprite->data[0];
+-            sprite->data[6]++;
+-        }
++        sprite->data[5]++;
++        sprite->data[6] = 0;
++    }
++    else
++    {
++        sprite->data[2] += sprite->data[0];
++        sprite->data[6]++;
+     }
+ }
+ 
+diff --git a/src/pokemon_storage_system.c b/src/pokemon_storage_system.c
+index 6ff9ec86..48d1fe9a 100644
+--- a/src/pokemon_storage_system.c
++++ b/src/pokemon_storage_system.c
+@@ -41,6 +41,9 @@
+ #include "constants/rgb.h"
+ #include "constants/songs.h"
+ #include "constants/pokemon_icon.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ 
+ /*
+     NOTE: This file is large. Some general groups of functions have
+@@ -660,7 +663,7 @@ static void MoveMon(void);
+ static void PlaceMon(void);
+ static void RefreshDisplayMon(void);
+ static void SetMovingMonData(u8, u8);
+-static void SetPlacedMonData(u8, u8);
++static bool8 SetPlacedMonData(u8, u8);
+ static void PurgeMonOrBoxMon(u8, u8);
+ static void SetShiftedMonData(u8, u8);
+ static bool8 TryStorePartyMonInBox(u8);
+@@ -1988,6 +1991,10 @@ static void VBlankCB_PokeStorage(void)
+ static void CB2_PokeStorage(void)
+ {
+     RunTasks();
++#if WASM
++    if (sStorage == NULL)
++        return;
++#endif
+     DoScheduledBgTilemapCopiesToVram();
+     ScrollBackground();
+     UpdateCloseBoxButtonFlash();
+@@ -6330,12 +6337,22 @@ static void PlaceMon(void)
+     switch (sCursorArea)
+     {
+     case CURSOR_AREA_IN_PARTY:
+-        SetPlacedMonData(TOTAL_BOXES_COUNT, sCursorPosition);
++        if (!SetPlacedMonData(TOTAL_BOXES_COUNT, sCursorPosition))
++            return;
+         SetPlacedMonSprite(TOTAL_BOXES_COUNT, sCursorPosition);
+         break;
+     case CURSOR_AREA_IN_BOX:
+         boxId = StorageGetCurrentBox();
+-        SetPlacedMonData(boxId, sCursorPosition);
++        if (!SetPlacedMonData(boxId, sCursorPosition))
++        {
++            if (sMovingMonOrigBoxId == TOTAL_BOXES_COUNT)
++            {
++                SetPlacedMonData(TOTAL_BOXES_COUNT, sMovingMonOrigBoxPos);
++                SetPlacedMonSprite(TOTAL_BOXES_COUNT, sMovingMonOrigBoxPos);
++            }
++            sIsMonBeingMoved = FALSE;
++            return;
++        }
+         SetPlacedMonSprite(boxId, sCursorPosition);
+         break;
+     default:
+@@ -6362,19 +6379,77 @@ static void SetMovingMonData(u8 boxId, u8 position)
+     sMovingMonOrigBoxPos = position;
+ }
+ 
+-static void SetPlacedMonData(u8 boxId, u8 position)
++static bool8 SetPlacedMonData(u8 boxId, u8 position)
+ {
++    // Linked-PC policy applies only when a living party member is actually
++    // committed to a PC box. Picking up/reordering within the party remains
++    // possible; the destination is known here, immediately before mutation.
++    if (boxId != TOTAL_BOXES_COUNT && sMovingMonOrigBoxId == TOTAL_BOXES_COUNT)
++    {
++#if WASM
++        u32 personality = GetMonData(&sStorage->movingMon, MON_DATA_PERSONALITY);
++        if (!WasmRunAllowPcBoxing(personality))
++            return FALSE;
++#endif
++    }
++
+     if (boxId == TOTAL_BOXES_COUNT)
+     {
+         gPlayerParty[position] = sStorage->movingMon;
++#if WASM
++        WasmRunSyncPartyLevels();
++#endif
+     }
+     else
+     {
+         BoxMonRestorePP(&sStorage->movingMon.box);
+         SetBoxMonAt(boxId, position, &sStorage->movingMon.box);
+     }
++    return TRUE;
+ }
+ 
++#if WASM
++u32 WasmRunDebugCanBoxPartyMon(u32 index)
++{
++    u32 personality;
++    if (index >= PARTY_SIZE || GetMonData(&gPlayerParty[index], MON_DATA_SPECIES) == SPECIES_NONE)
++        return FALSE;
++    personality = GetMonData(&gPlayerParty[index], MON_DATA_PERSONALITY);
++    return WasmRunAllowPcBoxing(personality);
++}
++
++// Exercise the same party-to-PC data path as PlaceMon/TryStorePartyMonInBox,
++// but without opening UI or changing the active PC panel. This automation probe
++// is only used to prove that a rejected move leaves both stores unchanged.
++u32 WasmRunDebugTryBoxPartyMon(u32 index)
++{
++    struct PokemonStorageSystemData *savedStorage = sStorage;
++    struct PokemonStorageSystemData *testStorage;
++    u8 boxId;
++    s16 boxPosition;
++    bool8 placed;
++
++    if (index >= PARTY_SIZE || GetMonData(&gPlayerParty[index], MON_DATA_SPECIES) == SPECIES_NONE)
++        return FALSE;
++    boxId = StorageGetCurrentBox();
++    boxPosition = GetFirstFreeBoxSpot(boxId);
++    if (boxPosition < 0)
++        return FALSE;
++    testStorage = Alloc(sizeof(*testStorage));
++    if (testStorage == NULL)
++        return FALSE;
++
++    sStorage = testStorage;
++    SetMovingMonData(TOTAL_BOXES_COUNT, index);
++    placed = SetPlacedMonData(boxId, boxPosition);
++    if (!placed)
++        SetPlacedMonData(TOTAL_BOXES_COUNT, index);
++    sStorage = savedStorage;
++    Free(testStorage);
++    return placed;
++}
++#endif
++
+ static void PurgeMonOrBoxMon(u8 boxId, u8 position)
+ {
+     if (boxId == TOTAL_BOXES_COUNT)
+@@ -6385,12 +6460,15 @@ static void PurgeMonOrBoxMon(u8 boxId, u8 position)
+ 
+ static void SetShiftedMonData(u8 boxId, u8 position)
+ {
++    sMovingMonOrigBoxId = boxId;
++    sMovingMonOrigBoxPos = position;
+     if (boxId == TOTAL_BOXES_COUNT)
+         sStorage->tempMon = gPlayerParty[position];
+     else
+         BoxMonAtToMon(boxId, position, &sStorage->tempMon);
+ 
+-    SetPlacedMonData(boxId, position);
++    if (!SetPlacedMonData(boxId, position))
++        return;
+     sStorage->movingMon = sStorage->tempMon;
+     SetDisplayMonData(&sStorage->movingMon, MODE_PARTY);
+     sMovingMonOrigBoxId = boxId;
+@@ -6405,14 +6483,19 @@ static bool8 TryStorePartyMonInBox(u8 boxId)
+ 
+     if (sIsMonBeingMoved)
+     {
+-        SetPlacedMonData(boxId, boxPosition);
++        if (!SetPlacedMonData(boxId, boxPosition))
++            return FALSE;
+         DestroyMovingMonIcon();
+         sIsMonBeingMoved = FALSE;
+     }
+     else
+     {
+         SetMovingMonData(TOTAL_BOXES_COUNT, sCursorPosition);
+-        SetPlacedMonData(boxId, boxPosition);
++        if (!SetPlacedMonData(boxId, boxPosition))
++        {
++            SetPlacedMonData(TOTAL_BOXES_COUNT, sCursorPosition);
++            return FALSE;
++        }
+         DestroyPartyMonIcon(sCursorPosition);
+     }
+ 
+diff --git a/src/script_pokemon_util.c b/src/script_pokemon_util.c
+index ed28d47c..bd070a02 100755
+--- a/src/script_pokemon_util.c
++++ b/src/script_pokemon_util.c
+@@ -6,6 +6,7 @@
+ #include "daycare.h"
+ #include "decompress.h"
+ #include "event_data.h"
++#include "fieldmap.h"
+ #include "international_string_util.h"
+ #include "link.h"
+ #include "link_rfu.h"
+@@ -23,6 +24,9 @@
+ #include "tv.h"
+ #include "constants/items.h"
+ #include "constants/battle_frontier.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ 
+ static void CB2_ReturnFromChooseHalfParty(void);
+ static void CB2_ReturnFromChooseBattleFrontierParty(void);
+@@ -70,6 +74,14 @@ u8 ScriptGiveMon(u16 species, u8 level, u16 item, u32 unused1, u32 unused2, u8 u
+     heldItem[1] = item >> 8;
+     SetMonData(&mon, MON_DATA_HELD_ITEM, heldItem);
+     sentToPc = GiveMonToPlayer(&mon);
++#if WASM
++    if (sentToPc != MON_CANT_GIVE)
++    {
++        u32 personality = GetMonData(&mon, MON_DATA_PERSONALITY, NULL);
++        u32 sectionId = WasmRunMapSection();
++        WasmRunOnGift(sectionId, sectionId, species, level, personality & 0xffff, personality >> 16);
++    }
++#endif
+     nationalDexNum = SpeciesToNationalPokedexNum(species);
+ 
+     // Don't set Pokédex flag for MON_CANT_GIVE
+@@ -92,8 +104,17 @@ u8 ScriptGiveEgg(u16 species)
+     CreateEgg(&mon, species, TRUE);
+     isEgg = TRUE;
+     SetMonData(&mon, MON_DATA_IS_EGG, &isEgg);
+-
+-    return GiveMonToPlayer(&mon);
++    isEgg = GiveMonToPlayer(&mon);
++#if WASM
++    if (isEgg != MON_CANT_GIVE)
++    {
++        u32 personality = GetMonData(&mon, MON_DATA_PERSONALITY, NULL);
++        u32 sectionId = WasmRunMapSection();
++        WasmRunOnGift(sectionId, sectionId, species,
++            GetMonData(&mon, MON_DATA_LEVEL, NULL), personality & 0xffff, personality >> 16);
++    }
++#endif
++    return isEgg;
+ }
+ 
+ void HasEnoughMonsForDoubleBattle(void)
+diff --git a/src/sprite.c b/src/sprite.c
+index 708a3e7f..c1c1d291 100644
+--- a/src/sprite.c
++++ b/src/sprite.c
+@@ -47,7 +47,9 @@ struct OamDimensions
+ };
+ 
+ static void UpdateOamCoords(void);
++#if !WASM
+ static void BuildSpritePriorities(void);
++#endif
+ static void SortSprites(void);
+ static void CopyMatricesToOamBuffer(void);
+ static void AddSpritesToOamBuffer(void);
+@@ -271,6 +273,13 @@ static const struct OamDimensions sOamDimensions[3][4] =
+ static u16 sSpriteTileRangeTags[MAX_SPRITES];
+ static u16 sSpriteTileRanges[MAX_SPRITES * 2];
+ static struct AffineAnimState sAffineAnimStates[OAM_MATRIX_COUNT];
++#if WASM
++static struct OamMatrix sEndMatrix[OAM_MATRIX_COUNT];
++static s16 sEndXScale[OAM_MATRIX_COUNT];
++static s16 sEndYScale[OAM_MATRIX_COUNT];
++static u16 sEndRotation[OAM_MATRIX_COUNT];
++static bool8 sEndValid[OAM_MATRIX_COUNT];
++#endif
+ static u16 sSpritePaletteTags[16];
+ 
+ // iwram common
+@@ -278,7 +287,9 @@ COMMON_DATA u32 gOamMatrixAllocBitmap = 0;
+ COMMON_DATA u8 gReservedSpritePaletteCount = 0;
+ 
+ EWRAM_DATA struct Sprite gSprites[MAX_SPRITES + 1] = {0};
++#if !WASM
+ EWRAM_DATA static u16 sSpritePriorities[MAX_SPRITES] = {0};
++#endif
+ EWRAM_DATA static u8 sSpriteOrder[MAX_SPRITES] = {0};
+ EWRAM_DATA static bool8 sShouldProcessSpriteCopyRequests = 0;
+ EWRAM_DATA static u8 sSpriteCopyRequestCount = 0;
+@@ -291,6 +302,43 @@ EWRAM_DATA s16 gSpriteCoordOffsetY = 0;
+ EWRAM_DATA struct OamMatrix gOamMatrices[OAM_MATRIX_COUNT] = {0};
+ EWRAM_DATA bool8 gAffineAnimsDisabled = FALSE;
+ 
++#if WASM
++static u32 sSortKey[MAX_SPRITES];
++static u32 sPrevSortKey[MAX_SPRITES];
++static u8 sSpriteOrderPos[MAX_SPRITES];
++static u8 sChangedSprites[MAX_SPRITES];
++static u8 sChangedSpriteCount;
++static bool8 sSortDirty;
++static bool8 sSpriteOrderValid;
++static u64 sVisibleSpriteMask;
++static u8 sVisibleSpriteOrder[MAX_SPRITES];
++static u8 sVisibleSpriteCount;
++static bool8 sVisibleSpriteOrderDirty;
++static u8 sOamCount;
++#if WASM
++static u8 sOamSpriteIds[128];
++static s16 sOamScreenXs[128];
++static s16 sOamScreenYs[128];
++static s16 sSpriteScreenXs[MAX_SPRITES];
++static s16 sSpriteScreenYs[MAX_SPRITES];
++#endif
++static u64 sActiveSpriteMask;
++static u64 sSortActiveSpriteMask;
++#endif
++
++#if WASM
++void WasmSetSpriteActive(u8 spriteId, bool8 active)
++{
++    if (spriteId < MAX_SPRITES)
++    {
++        if (active)
++            sActiveSpriteMask |= (u64)1 << spriteId;
++        else
++            sActiveSpriteMask &= ~((u64)1 << spriteId);
++    }
++}
++#endif
++
+ void ResetSpriteData(void)
+ {
+     ResetOamRange(0, 128);
+@@ -303,11 +351,52 @@ void ResetSpriteData(void)
+     AllocSpriteTiles(0);
+     gSpriteCoordOffsetX = 0;
+     gSpriteCoordOffsetY = 0;
++#if WASM
++    sSpriteOrderValid = FALSE;
++#endif
+ }
+ 
+ void AnimateSprites(void)
+ {
+     u8 i;
++#if WASM
++    bool8 affineDisabled = gAffineAnimsDisabled;
++    u8 nextSpriteId = 0;
++    while (nextSpriteId < MAX_SPRITES)
++    {
++        u64 remainingSprites = sActiveSpriteMask & (~(u64)0 << nextSpriteId);
++        if (remainingSprites == 0)
++            break;
++        i = __builtin_ctzll(remainingSprites);
++        nextSpriteId = i + 1;
++        struct Sprite *sprite = &gSprites[i];
++
++        if (sprite->inUse)
++        {
++            sprite->callback(sprite);
++
++            if (sprite->inUse)
++            {
++                if (!sprite->animBeginning && sprite->animEnded)
++                {
++                    /* anim finished: nothing to do this frame */
++                }
++                else if (sprite->animBeginning)
++                    BeginAnim(sprite);
++                else
++                    ContinueAnim(sprite);
++
++                if (!affineDisabled && (sprite->oam.affineMode & ST_OAM_AFFINE_ON_MASK))
++                {
++                    if (sprite->affineAnimBeginning)
++                        BeginAffineAnim(sprite);
++                    else
++                        ContinueAffineAnim(sprite);
++                }
++            }
++        }
++    }
++#else
+     for (i = 0; i < MAX_SPRITES; i++)
+     {
+         struct Sprite *sprite = &gSprites[i];
+@@ -320,13 +409,16 @@ void AnimateSprites(void)
+                 AnimateSprite(sprite);
+         }
+     }
++#endif
+ }
+ 
+ void BuildOamBuffer(void)
+ {
+     u8 temp;
+     UpdateOamCoords();
++#if !WASM
+     BuildSpritePriorities();
++#endif
+     SortSprites();
+     temp = gMain.oamLoadDisabled;
+     gMain.oamLoadDisabled = TRUE;
+@@ -336,9 +428,97 @@ void BuildOamBuffer(void)
+     sShouldProcessSpriteCopyRequests = TRUE;
+ }
+ 
++#if WASM
++static s16 CalcSpriteSortY(const struct Sprite *sprite)
++{
++    s16 y = sprite->oam.y;
++    if (y < 129)
++        return y;
++    if (y >= DISPLAY_HEIGHT)
++        return y - 256;
++    if (sprite->oam.affineMode == ST_OAM_AFFINE_DOUBLE
++     && sprite->oam.size == ST_OAM_SIZE_3)
++    {
++        u32 shape = sprite->oam.shape;
++        if (shape == ST_OAM_SQUARE || shape == ST_OAM_V_RECTANGLE)
++            return y - 256;
++    }
++    return y;
++}
++
++extern void WasmCopyOamMatrices(const struct OamMatrix *matrices, struct OamData *oamBuffer,
++                                const struct OamData *dummyOam, u32 oamCount, u32 oamLimit);
++#endif
++
+ void UpdateOamCoords(void)
+ {
+     u8 i;
++#if WASM
++    u64 visibleSpriteMask = 0;
++    u64 activeSpriteMask = sActiveSpriteMask;
++    u64 spritesToUpdate = activeSpriteMask | (activeSpriteMask ^ sSortActiveSpriteMask);
++    sSortDirty = !sSpriteOrderValid;
++    sChangedSpriteCount = 0;
++    if (!sSpriteOrderValid)
++        spritesToUpdate = ~(u64)0;
++    while (spritesToUpdate != 0)
++    {
++        u64 spriteBit;
++        struct Sprite *sprite;
++        u32 key;
++
++        i = __builtin_ctzll(spritesToUpdate);
++        spriteBit = (u64)1 << i;
++        spritesToUpdate &= ~spriteBit;
++        sprite = &gSprites[i];
++
++        if ((activeSpriteMask & spriteBit) && !sprite->invisible)
++        {
++            visibleSpriteMask |= spriteBit;
++            s32 x = sprite->x + sprite->x2 + sprite->centerToCornerVecX;
++            s32 y = sprite->y + sprite->y2 + sprite->centerToCornerVecY;
++            if (sprite->coordOffsetEnabled)
++            {
++                x += gSpriteCoordOffsetX;
++                y += gSpriteCoordOffsetY;
++            }
++            sSpriteScreenXs[i] = x;
++            sSpriteScreenYs[i] = y;
++            sprite->oam.x = x;
++            sprite->oam.y = y;
++        }
++
++        key = ((u32)(sprite->subpriority | (sprite->oam.priority << 8)) << 16)
++                | (u16)(32768 - CalcSpriteSortY(sprite));
++        if (key != sPrevSortKey[i])
++        {
++            sChangedSprites[sChangedSpriteCount++] = i;
++            sPrevSortKey[i] = key;
++            sSortKey[i] = key;
++        }
++    }
++    sSortActiveSpriteMask = activeSpriteMask;
++    if (visibleSpriteMask != sVisibleSpriteMask)
++    {
++        sVisibleSpriteMask = visibleSpriteMask;
++        sVisibleSpriteOrderDirty = TRUE;
++    }
++
++    if (sSpriteOrderValid)
++    {
++        for (i = 0; i < sChangedSpriteCount; i++)
++        {
++            u8 spriteId = sChangedSprites[i];
++            u8 pos = sSpriteOrderPos[spriteId];
++            if ((pos > 0 && sSortKey[sSpriteOrder[pos - 1]] > sSortKey[spriteId])
++             || (pos + 1 < MAX_SPRITES && sSortKey[spriteId] > sSortKey[sSpriteOrder[pos + 1]]))
++            {
++                sSortDirty = TRUE;
++                break;
++            }
++        }
++    }
++#else
+     for (i = 0; i < MAX_SPRITES; i++)
+     {
+         struct Sprite *sprite = &gSprites[i];
+@@ -356,8 +536,10 @@ void UpdateOamCoords(void)
+             }
+         }
+     }
++#endif
+ }
+ 
++#if !WASM
+ void BuildSpritePriorities(void)
+ {
+     u16 i;
+@@ -368,10 +550,38 @@ void BuildSpritePriorities(void)
+         sSpritePriorities[i] = priority;
+     }
+ }
++#endif
+ 
+ void SortSprites(void)
+ {
+     u8 i;
++#if WASM
++    if (!sSortDirty)
++        return;
++    for (i = 1; i < MAX_SPRITES; i++)
++    {
++        u8 j = i;
++        u32 sprite1Key = sSortKey[sSpriteOrder[i - 1]];
++        u32 sprite2Key = sSortKey[sSpriteOrder[i]];
++        while (j > 0 && sprite1Key > sprite2Key)
++        {
++            u8 temp = sSpriteOrder[j];
++            sSpriteOrder[j] = sSpriteOrder[j - 1];
++            sSpriteOrder[j - 1] = temp;
++            j--;
++#ifdef UBFIX
++            if (j == 0)
++                break;
++#endif
++            sprite1Key = sSortKey[sSpriteOrder[j - 1]];
++            sprite2Key = sSortKey[sSpriteOrder[j]];
++        }
++    }
++    for (i = 0; i < MAX_SPRITES; i++)
++        sSpriteOrderPos[sSpriteOrder[i]] = i;
++    sSpriteOrderValid = TRUE;
++    sVisibleSpriteOrderDirty = TRUE;
++#else
+     for (i = 1; i < MAX_SPRITES; i++)
+     {
+         u8 j = i;
+@@ -464,10 +674,129 @@ void SortSprites(void)
+             }
+         }
+     }
++#endif
++}
++
++#if WASM
++enum
++{
++    SPRITE_SORT_CHECK_RESET = 1 << 0,
++    SPRITE_SORT_CHECK_INACTIVE = 1 << 1,
++    SPRITE_SORT_CHECK_INVISIBLE = 1 << 2,
++    SPRITE_SORT_CHECK_COPY_ACTIVE = 1 << 3,
++};
++
++static void SetSpriteSortCheckSprite(u8 spriteId, u8 subpriority)
++{
++    struct Sprite *sprite = &gSprites[spriteId];
++
++    ResetSprite(sprite);
++    sprite->inUse = TRUE;
++    WasmSetSpriteActive(spriteId, TRUE);
++    sprite->subpriority = subpriority;
++    sprite->oam.priority = 0;
++    sprite->x = 0;
++    sprite->y = 0;
++    sprite->centerToCornerVecX = 0;
++    sprite->centerToCornerVecY = 0;
+ }
+ 
++static bool8 SpriteSortCheckStartsWith(u8 first, u8 second)
++{
++    return sSpriteOrder[0] == first && sSpriteOrder[1] == second;
++}
++
++u32 WasmCheckSpriteSort(void)
++{
++    u32 failures = 0;
++
++    // ResetSpriteData must invalidate an order cached for the same per-slot keys.
++    ResetSpriteData();
++    SetSpriteSortCheckSprite(0, 2);
++    SetSpriteSortCheckSprite(1, 1);
++    UpdateOamCoords();
++    SortSprites();
++    ResetSpriteData();
++    SetSpriteSortCheckSprite(0, 2);
++    SetSpriteSortCheckSprite(1, 1);
++    UpdateOamCoords();
++    SortSprites();
++    if (!SpriteSortCheckStartsWith(1, 0))
++        failures |= SPRITE_SORT_CHECK_RESET;
++
++    // An inactive slot must move before reuse so stable ties match the original sort.
++    ResetSpriteData();
++    SetSpriteSortCheckSprite(0, 1);
++    SetSpriteSortCheckSprite(1, 1);
++    UpdateOamCoords();
++    SortSprites();
++    ResetSprite(&gSprites[0]);
++    UpdateOamCoords();
++    SortSprites();
++    SetSpriteSortCheckSprite(0, 1);
++    UpdateOamCoords();
++    SortSprites();
++    if (!SpriteSortCheckStartsWith(1, 0))
++        failures |= SPRITE_SORT_CHECK_INACTIVE;
++
++    // Hidden key changes must also preserve tie order when the sprite is shown again.
++    ResetSpriteData();
++    SetSpriteSortCheckSprite(0, 1);
++    SetSpriteSortCheckSprite(1, 1);
++    UpdateOamCoords();
++    SortSprites();
++    gSprites[0].invisible = TRUE;
++    gSprites[0].subpriority = 2;
++    UpdateOamCoords();
++    SortSprites();
++    gSprites[0].subpriority = 1;
++    UpdateOamCoords();
++    SortSprites();
++    gSprites[0].invisible = FALSE;
++    UpdateOamCoords();
++    SortSprites();
++    if (!SpriteSortCheckStartsWith(1, 0))
++        failures |= SPRITE_SORT_CHECK_INVISIBLE;
++
++    // Restoring gSprites must also restore the active-slot cache.
++    ResetSpriteData();
++    SetSpriteSortCheckSprite(3, 0);
++    sActiveSpriteMask = ~(u64)0;
++    CopyToSprites((u8 *)gSprites);
++    if (sActiveSpriteMask != ((u64)1 << 3))
++        failures |= SPRITE_SORT_CHECK_COPY_ACTIVE;
++
++    return failures;
++}
++#endif
++
++#if WASM
++u32 WasmOamCount(void)
++{
++    return sOamCount;
++}
++
++u32 WasmOamSpriteId(u32 oamIndex)
++{
++    return oamIndex < sOamCount ? sOamSpriteIds[oamIndex] : MAX_SPRITES;
++}
++
++s32 WasmOamScreenX(u32 oamIndex)
++{
++    return oamIndex < sOamCount ? sOamScreenXs[oamIndex] : 0;
++}
++
++s32 WasmOamScreenY(u32 oamIndex)
++{
++    return oamIndex < sOamCount ? sOamScreenYs[oamIndex] : 0;
++}
++#endif
++
+ void CopyMatricesToOamBuffer(void)
+ {
++#if WASM
++    WasmCopyOamMatrices(gOamMatrices, gMain.oamBuffer, &gDummyOamData, sOamCount, gOamLimit);
++#else
+     u8 i;
+     for (i = 0; i < OAM_MATRIX_COUNT; i++)
+     {
+@@ -477,6 +806,7 @@ void CopyMatricesToOamBuffer(void)
+         gMain.oamBuffer[base + 2].affineParam = gOamMatrices[i].c;
+         gMain.oamBuffer[base + 3].affineParam = gOamMatrices[i].d;
+     }
++#endif
+ }
+ 
+ void AddSpritesToOamBuffer(void)
+@@ -484,6 +814,47 @@ void AddSpritesToOamBuffer(void)
+     u8 i = 0;
+     u8 oamIndex = 0;
+ 
++#if WASM
++    if (sVisibleSpriteOrderDirty)
++    {
++        sVisibleSpriteCount = 0;
++        for (i = 0; i < MAX_SPRITES; i++)
++        {
++            u8 spriteId = sSpriteOrder[i];
++            if ((sVisibleSpriteMask & ((u64)1 << spriteId)) != 0)
++                sVisibleSpriteOrder[sVisibleSpriteCount++] = spriteId;
++        }
++        sVisibleSpriteOrderDirty = FALSE;
++        i = 0;
++    }
++
++    while (i < sVisibleSpriteCount)
++    {
++        const u8 spriteId = sVisibleSpriteOrder[i];
++        const u8 firstOam = oamIndex;
++        const bool8 full = AddSpriteToOamBuffer(&gSprites[spriteId], &oamIndex);
++
++        for (u8 entry = firstOam; entry < oamIndex; entry++)
++        {
++            s16 dx = (s16)gMain.oamBuffer[entry].x - gSprites[spriteId].oam.x;
++            s16 dy = (s16)gMain.oamBuffer[entry].y - gSprites[spriteId].oam.y;
++            if (dx >= 256) dx -= 512;
++            else if (dx < -256) dx += 512;
++            if (dy >= 128) dy -= 256;
++            else if (dy < -128) dy += 256;
++            sOamSpriteIds[entry] = spriteId;
++            sOamScreenXs[entry] = sSpriteScreenXs[spriteId] + dx;
++            sOamScreenYs[entry] = sSpriteScreenYs[spriteId] + dy;
++        }
++        if (full)
++        {
++            sOamCount = oamIndex;
++            return;
++        }
++        i++;
++    }
++    sOamCount = oamIndex;
++#else
+     while (i < MAX_SPRITES)
+     {
+         struct Sprite *sprite = &gSprites[sSpriteOrder[i]];
+@@ -491,12 +862,15 @@ void AddSpritesToOamBuffer(void)
+             return;
+         i++;
+     }
++#endif
+ 
++#if !WASM
+     while (oamIndex < gOamLimit)
+     {
+         gMain.oamBuffer[oamIndex] = gDummyOamData;
+         oamIndex++;
+     }
++#endif
+ }
+ 
+ u8 CreateSprite(const struct SpriteTemplate *template, s16 x, s16 y, u8 subpriority)
+@@ -585,6 +959,9 @@ u8 CreateSpriteAt(u8 index, const struct SpriteTemplate *template, s16 x, s16 y,
+     if (template->paletteTag != TAG_NONE)
+         sprite->oam.paletteNum = IndexOfSpritePaletteTag(template->paletteTag);
+ 
++#if WASM
++    WasmSetSpriteActive(index, TRUE);
++#endif
+     return index;
+ }
+ 
+@@ -681,6 +1058,10 @@ void SetOamMatrix(u8 matrixNum, u16 a, u16 b, u16 c, u16 d)
+ 
+ void ResetSprite(struct Sprite *sprite)
+ {
++#if WASM
++    u32 spriteId = sprite - gSprites;
++    WasmSetSpriteActive(spriteId, FALSE);
++#endif
+     *sprite = sDummySprite;
+ }
+ 
+@@ -843,6 +1224,14 @@ void CopyToSprites(u8 *src)
+         src++;
+         dest++;
+     }
++#if WASM
++    sActiveSpriteMask = 0;
++    for (i = 0; i < MAX_SPRITES; i++)
++    {
++        if (gSprites[i].inUse)
++            sActiveSpriteMask |= (u64)1 << i;
++    }
++#endif
+ }
+ 
+ void ResetAllSprites(void)
+@@ -1098,13 +1487,37 @@ void ContinueAffineAnim(struct Sprite *sprite)
+         else
+         {
+             s16 type;
++#if !WASM
+             s16 funcIndex;
++#endif
+             sAffineAnimStates[matrixNum].animCmdIndex++;
+             type = sprite->affineAnims[sAffineAnimStates[matrixNum].animNum][sAffineAnimStates[matrixNum].animCmdIndex].type;
++#if WASM
++            if (type >= 32765)
++            {
++                switch (type - 32765)
++                {
++                case 0:
++                    AffineAnimCmd_loop(matrixNum, sprite);
++                    break;
++                case 1:
++                    AffineAnimCmd_jump(matrixNum, sprite);
++                    break;
++                case 2:
++                    AffineAnimCmd_end(matrixNum, sprite);
++                    break;
++                }
++            }
++            else
++            {
++                AffineAnimCmd_frame(matrixNum, sprite);
++            }
++#else
+             funcIndex = 3;
+             if (type >= 32765)
+                 funcIndex = type - 32765;
+             sAffineAnimCmdFuncs[funcIndex](matrixNum, sprite);
++#endif
+         }
+         if (sprite->anchored)
+             UpdateSpriteMatrixAnchorPos(sprite, sprite->sAnchorX, sprite->sAnchorY);
+@@ -1171,10 +1584,36 @@ void AffineAnimCmd_jump(u8 matrixNum, struct Sprite *sprite)
+ 
+ void AffineAnimCmd_end(u8 matrixNum, struct Sprite *sprite)
+ {
++#if WASM
++    sprite->affineAnimEnded = TRUE;
++    sAffineAnimStates[matrixNum].animCmdIndex--;
++    if (sEndValid[matrixNum]
++     && sAffineAnimStates[matrixNum].xScale == sEndXScale[matrixNum]
++     && sAffineAnimStates[matrixNum].yScale == sEndYScale[matrixNum]
++     && sAffineAnimStates[matrixNum].rotation == sEndRotation[matrixNum])
++    {
++        if (gOamMatrices[matrixNum].a != sEndMatrix[matrixNum].a
++         || gOamMatrices[matrixNum].b != sEndMatrix[matrixNum].b
++         || gOamMatrices[matrixNum].c != sEndMatrix[matrixNum].c
++         || gOamMatrices[matrixNum].d != sEndMatrix[matrixNum].d)
++            CopyOamMatrix(matrixNum, &sEndMatrix[matrixNum]);
++    }
++    else
++    {
++        struct AffineAnimFrameCmd dummyFrameCmd = {0};
++        ApplyAffineAnimFrameRelativeAndUpdateMatrix(matrixNum, &dummyFrameCmd);
++        sEndXScale[matrixNum] = sAffineAnimStates[matrixNum].xScale;
++        sEndYScale[matrixNum] = sAffineAnimStates[matrixNum].yScale;
++        sEndRotation[matrixNum] = sAffineAnimStates[matrixNum].rotation;
++        sEndMatrix[matrixNum] = gOamMatrices[matrixNum];
++        sEndValid[matrixNum] = TRUE;
++    }
++#else
+     struct AffineAnimFrameCmd dummyFrameCmd = {0};
+     sprite->affineAnimEnded = TRUE;
+     sAffineAnimStates[matrixNum].animCmdIndex--;
+     ApplyAffineAnimFrameRelativeAndUpdateMatrix(matrixNum, &dummyFrameCmd);
++#endif
+ }
+ 
+ void AffineAnimCmd_frame(u8 matrixNum, struct Sprite *sprite)
+@@ -1706,6 +2145,9 @@ bool8 AddSubspritesToOamBuffer(struct Sprite *sprite, struct OamData *destOam, u
+         u8 hFlip;
+         u8 vFlip;
+         u8 i;
++#if WASM
++        u64 baseOam;
++#endif
+ 
+         tileNum = oam->tileNum;
+         subspriteCount = subspriteTable->subspriteCount;
+@@ -1713,6 +2155,9 @@ bool8 AddSubspritesToOamBuffer(struct Sprite *sprite, struct OamData *destOam, u
+         vFlip = ((s32)oam->matrixNum >> 4) & 1;
+         baseX = oam->x - sprite->centerToCornerVecX;
+         baseY = oam->y - sprite->centerToCornerVecY;
++#if WASM
++        __builtin_memcpy(&baseOam, oam, sizeof(baseOam));
++#endif
+ 
+         for (i = 0; i < subspriteCount; i++, (*oamIndex)++)
+         {
+@@ -1743,6 +2188,26 @@ bool8 AddSubspritesToOamBuffer(struct Sprite *sprite, struct OamData *destOam, u
+                 y = ~y + 1;
+             }
+ 
++#if WASM
++            u64 outputOam = baseOam;
++
++            outputOam &= ~(((u64)0xFF << 0)
++                         | ((u64)0x3 << 14)
++                         | ((u64)0x1FF << 16)
++                         | ((u64)0x3 << 30)
++                         | ((u64)0x3FF << 32));
++            outputOam |= (u8)(baseY + y);
++            outputOam |= (u64)subspriteTable->subsprites[i].shape << 14;
++            outputOam |= ((u64)((s16)baseX + (s16)x) & 0x1FF) << 16;
++            outputOam |= (u64)subspriteTable->subsprites[i].size << 30;
++            outputOam |= ((u64)(tileNum + subspriteTable->subsprites[i].tileOffset) & 0x3FF) << 32;
++            if (sprite->subspriteMode != SUBSPRITES_IGNORE_PRIORITY)
++            {
++                outputOam &= ~((u64)0x3 << 42);
++                outputOam |= (u64)subspriteTable->subsprites[i].priority << 42;
++            }
++            __builtin_memcpy(&destOam[i], &outputOam, sizeof(outputOam));
++#else
+             destOam[i] = *oam;
+             destOam[i].shape = subspriteTable->subsprites[i].shape;
+             destOam[i].size = subspriteTable->subsprites[i].size;
+@@ -1752,6 +2217,7 @@ bool8 AddSubspritesToOamBuffer(struct Sprite *sprite, struct OamData *destOam, u
+ 
+             if (sprite->subspriteMode != SUBSPRITES_IGNORE_PRIORITY)
+                 destOam[i].priority = subspriteTable->subsprites[i].priority;
++#endif
+         }
+     }
+ 
+diff --git a/src/task.c b/src/task.c
+index b188cbbc..a0e30f93 100644
+--- a/src/task.c
++++ b/src/task.c
+@@ -5,6 +5,9 @@ COMMON_DATA struct Task gTasks[NUM_TASKS] = {0};
+ 
+ static void InsertTask(u8 newTaskId);
+ static u8 FindFirstActiveTask(void);
++#if WASM
++static u8 sFirstActiveTask;
++#endif
+ 
+ void ResetTasks(void)
+ {
+@@ -22,6 +25,9 @@ void ResetTasks(void)
+ 
+     gTasks[0].prev = HEAD_SENTINEL;
+     gTasks[NUM_TASKS - 1].next = TAIL_SENTINEL;
++#if WASM
++    sFirstActiveTask = NUM_TASKS;
++#endif
+ }
+ 
+ u8 CreateTask(TaskFunc func, u8 priority)
+@@ -53,6 +59,9 @@ static void InsertTask(u8 newTaskId)
+         // The new task is the only task.
+         gTasks[newTaskId].prev = HEAD_SENTINEL;
+         gTasks[newTaskId].next = TAIL_SENTINEL;
++#if WASM
++        sFirstActiveTask = newTaskId;
++#endif
+         return;
+     }
+ 
+@@ -66,6 +75,10 @@ static void InsertTask(u8 newTaskId)
+             gTasks[newTaskId].next = taskId;
+             if (gTasks[taskId].prev != HEAD_SENTINEL)
+                 gTasks[gTasks[taskId].prev].next = newTaskId;
++#if WASM
++            else
++                sFirstActiveTask = newTaskId;
++#endif
+             gTasks[taskId].prev = newTaskId;
+             return;
+         }
+@@ -86,6 +99,10 @@ void DestroyTask(u8 taskId)
+     if (gTasks[taskId].isActive)
+     {
+         gTasks[taskId].isActive = FALSE;
++#if WASM
++        if (sFirstActiveTask == taskId)
++            sFirstActiveTask = gTasks[taskId].next == TAIL_SENTINEL ? NUM_TASKS : gTasks[taskId].next;
++#endif
+ 
+         if (gTasks[taskId].prev == HEAD_SENTINEL)
+         {
+@@ -123,6 +140,9 @@ void RunTasks(void)
+ 
+ static u8 FindFirstActiveTask(void)
+ {
++#if WASM
++    return sFirstActiveTask;
++#else
+     u8 taskId;
+ 
+     for (taskId = 0; taskId < NUM_TASKS; taskId++)
+@@ -130,6 +150,7 @@ static u8 FindFirstActiveTask(void)
+             break;
+ 
+     return taskId;
++#endif
+ }
+ 
+ void TaskDummy(u8 taskId)
+@@ -140,8 +161,7 @@ void SetTaskFuncWithFollowupFunc(u8 taskId, TaskFunc func, TaskFunc followupFunc
+ {
+     u8 followupFuncIndex = NUM_TASK_DATA - 2; // Should be const.
+ 
+-    gTasks[taskId].data[followupFuncIndex] = (s16)((u32)followupFunc);
+-    gTasks[taskId].data[followupFuncIndex + 1] = (s16)((u32)followupFunc >> 16); // Store followupFunc as two half-words in the data array.
++    SetWordTaskArg(taskId, followupFuncIndex, (u32)(uintptr_t)followupFunc);
+     gTasks[taskId].func = func;
+ }
+ 
+@@ -149,7 +169,7 @@ void SwitchTaskToFollowupFunc(u8 taskId)
+ {
+     u8 followupFuncIndex = NUM_TASK_DATA - 2; // Should be const.
+ 
+-    gTasks[taskId].func = (TaskFunc)((u16)(gTasks[taskId].data[followupFuncIndex]) | (gTasks[taskId].data[followupFuncIndex + 1] << 16));
++    gTasks[taskId].func = (TaskFunc)(uintptr_t)GetWordTaskArg(taskId, followupFuncIndex);
+ }
+ 
+ bool8 FuncIsActiveTask(TaskFunc func)
+@@ -198,7 +218,7 @@ void SetWordTaskArg(u8 taskId, u8 dataElem, u32 value)
+ u32 GetWordTaskArg(u8 taskId, u8 dataElem)
+ {
+     if (dataElem < NUM_TASK_DATA - 1)
+-        return (u16)gTasks[taskId].data[dataElem] | (gTasks[taskId].data[dataElem + 1] << 16);
++        return (u16)gTasks[taskId].data[dataElem] | ((u32)(u16)gTasks[taskId].data[dataElem + 1] << 16);
+     else
+         return 0;
+ }
+diff --git a/src/tileset_anims.c b/src/tileset_anims.c
+index 8577ca67..d5da7afd 100644
+--- a/src/tileset_anims.c
++++ b/src/tileset_anims.c
+@@ -6,6 +6,7 @@
+ #include "task.h"
+ #include "battle_transition.h"
+ #include "fieldmap.h"
++#include "field_weather.h"
+ 
+ static EWRAM_DATA struct {
+     const u16 *src;
+@@ -20,6 +21,14 @@ static u16 sSecondaryTilesetAnimCounter;
+ static u16 sSecondaryTilesetAnimCounterMax;
+ static void (*sPrimaryTilesetAnimCallback)(u16);
+ static void (*sSecondaryTilesetAnimCallback)(u16);
++#if WASM
++static u8 *sWasmTilesetAnimDest;
++static bool8 sWasmTilesetAnimSecondary;
++static u16 sWasmSavedPlttUnfaded[PLTT_BUFFER_SIZE];
++static u16 sWasmSavedPlttFaded[PLTT_BUFFER_SIZE];
++static u32 sWasmPrimaryTilesetAnimFrame;
++static u32 sWasmSecondaryTilesetAnimFrame;
++#endif
+ 
+ static void _InitPrimaryTilesetAnimation(void);
+ static void _InitSecondaryTilesetAnimation(void);
+@@ -547,11 +556,30 @@ static const u16 *const sTilesetAnims_BattleDomeFloorLightPals[] = {
+ static void ResetTilesetAnimBuffer(void)
+ {
+     sTilesetDMA3TransferBufferSize = 0;
++#if !WASM
+     CpuFill32(0, sTilesetDMA3TransferBuffer, sizeof sTilesetDMA3TransferBuffer);
++#endif
+ }
+ 
+ static void AppendTilesetAnimToBuffer(const u16 *src, u16 *dest, u16 size)
+ {
++#if WASM
++    if (sWasmTilesetAnimDest != NULL)
++    {
++        const u32 globalOffset = (u8 *)dest - (u8 *)BG_VRAM;
++        const u32 baseOffset = sWasmTilesetAnimSecondary ? NUM_TILES_IN_PRIMARY * TILE_SIZE_4BPP : 0;
++        const u32 limit = (sWasmTilesetAnimSecondary ? NUM_TILES_TOTAL - NUM_TILES_IN_PRIMARY
++                                                     : NUM_TILES_IN_PRIMARY) * TILE_SIZE_4BPP;
++        if (globalOffset >= baseOffset && globalOffset + size <= baseOffset + limit)
++        {
++            const u8 *source = (const u8 *)src;
++            u8 *target = sWasmTilesetAnimDest + globalOffset - baseOffset;
++            for (u32 i = 0; i < size; i++)
++                target[i] = source[i];
++        }
++        return;
++    }
++#endif
+     if (sTilesetDMA3TransferBufferSize < 20)
+     {
+         sTilesetDMA3TransferBuffer[sTilesetDMA3TransferBufferSize].src = src;
+@@ -561,6 +589,79 @@ static void AppendTilesetAnimToBuffer(const u16 *src, u16 *dest, u16 size)
+     }
+ }
+ 
++#if WASM
++u32 WasmTilesetAnimationFrame(bool8 secondary)
++{
++    return secondary ? sWasmSecondaryTilesetAnimFrame : sWasmPrimaryTilesetAnimFrame;
++}
++
++void WasmApplyTilesetAnimations(const struct Tileset *tileset, u8 *dest, u16 *palettes,
++                                 u16 *displayPalettes, u32 firstFrame, u32 lastFrame)
++{
++    const u16 savedPrimaryCounter = sPrimaryTilesetAnimCounter;
++    const u16 savedPrimaryMax = sPrimaryTilesetAnimCounterMax;
++    const u16 savedSecondaryCounter = sSecondaryTilesetAnimCounter;
++    const u16 savedSecondaryMax = sSecondaryTilesetAnimCounterMax;
++    void (*savedPrimaryCallback)(u16) = sPrimaryTilesetAnimCallback;
++    void (*savedSecondaryCallback)(u16) = sSecondaryTilesetAnimCallback;
++    void (*callback)(u16);
++    u16 counterMax;
++
++    if (tileset == NULL)
++        return;
++    for (u32 i = 0; i < PLTT_BUFFER_SIZE; i++)
++    {
++        sWasmSavedPlttUnfaded[i] = gPlttBufferUnfaded[i];
++        sWasmSavedPlttFaded[i] = gPlttBufferFaded[i];
++        if (i < BG_PLTT_ID(16))
++        {
++            gPlttBufferUnfaded[i] = palettes[i];
++            gPlttBufferFaded[i] = palettes[i];
++        }
++    }
++    callback = NULL;
++    counterMax = 0;
++    if (tileset->callback != NULL)
++    {
++        tileset->callback();
++        callback = tileset->isSecondary ? sSecondaryTilesetAnimCallback : sPrimaryTilesetAnimCallback;
++        counterMax = tileset->isSecondary ? sSecondaryTilesetAnimCounterMax : sPrimaryTilesetAnimCounterMax;
++    }
++    sWasmTilesetAnimDest = dest;
++    sWasmTilesetAnimSecondary = tileset->isSecondary;
++    if (callback != NULL && counterMax != 0 && firstFrame <= lastFrame)
++    {
++        for (u32 frame = firstFrame; frame <= lastFrame; frame++)
++            callback(frame % counterMax);
++    }
++    sWasmTilesetAnimDest = NULL;
++    for (u32 palette = 0; palette < 16; palette++)
++    {
++        // Reproduce the live display-palette pipeline for cached connected
++        // tilesets, including weather color maps and an active global fade.
++        ApplyWeatherColorMapToPal(palette);
++        if (gPaletteFade.active && (gPaletteFade_selectedPalettes & (1 << palette)))
++            BlendPalette(BG_PLTT_ID(palette), 16, gPaletteFade.y, gPaletteFade.blendColor & 0x7fff);
++    }
++    for (u32 i = 0; i < PLTT_BUFFER_SIZE; i++)
++    {
++        if (i < BG_PLTT_ID(16))
++        {
++            palettes[i] = gPlttBufferUnfaded[i];
++            displayPalettes[i] = gPlttBufferFaded[i];
++        }
++        gPlttBufferUnfaded[i] = sWasmSavedPlttUnfaded[i];
++        gPlttBufferFaded[i] = sWasmSavedPlttFaded[i];
++    }
++    sPrimaryTilesetAnimCounter = savedPrimaryCounter;
++    sPrimaryTilesetAnimCounterMax = savedPrimaryMax;
++    sSecondaryTilesetAnimCounter = savedSecondaryCounter;
++    sSecondaryTilesetAnimCounterMax = savedSecondaryMax;
++    sPrimaryTilesetAnimCallback = savedPrimaryCallback;
++    sSecondaryTilesetAnimCallback = savedSecondaryCallback;
++}
++#endif
++
+ void TransferTilesetAnimsBuffer(void)
+ {
+     int i;
+@@ -576,15 +677,28 @@ void InitTilesetAnimations(void)
+     ResetTilesetAnimBuffer();
+     _InitPrimaryTilesetAnimation();
+     _InitSecondaryTilesetAnimation();
++#if WASM
++    // These epochs represent the absolute phase of the next callback. Some
++    // secondary initializers deliberately inherit the current primary phase.
++    sWasmPrimaryTilesetAnimFrame = sPrimaryTilesetAnimCounter;
++    sWasmSecondaryTilesetAnimFrame = sSecondaryTilesetAnimCounter;
++#endif
+ }
+ 
+ void InitSecondaryTilesetAnimation(void)
+ {
+     _InitSecondaryTilesetAnimation();
++#if WASM
++    sWasmSecondaryTilesetAnimFrame = sSecondaryTilesetAnimCounter;
++#endif
+ }
+ 
+ void UpdateTilesetAnimations(void)
+ {
++#if WASM
++    sWasmPrimaryTilesetAnimFrame++;
++    sWasmSecondaryTilesetAnimFrame++;
++#endif
+     ResetTilesetAnimBuffer();
+     if (++sPrimaryTilesetAnimCounter >= sPrimaryTilesetAnimCounterMax)
+         sPrimaryTilesetAnimCounter = 0;
+diff --git a/src/union_room.c b/src/union_room.c
+index cd94cf23..ad9cb47b 100644
+--- a/src/union_room.c
++++ b/src/union_room.c
+@@ -3293,6 +3293,9 @@ static bool32 HandleContactFromOtherPlayer(struct WirelessLink_URoom *uroom)
+ 
+ void InitUnionRoom(void)
+ {
++#if WASM
++    sUnionRoomPlayerName[0] = EOS;
++#else
+     struct WirelessLink_URoom *data;
+ 
+     sUnionRoomPlayerName[0] = EOS;
+@@ -3305,6 +3308,7 @@ void InitUnionRoom(void)
+     data->unknown = 0;
+     data->unreadPlayerId = 0;
+     sUnionRoomPlayerName[0] = EOS;
++#endif
+ }
+ 
+ static void Task_InitUnionRoom(u8 taskId)
+diff --git a/src/util.c b/src/util.c
+index ec7a4ea6..9074d0ae 100644
+--- a/src/util.c
++++ b/src/util.c
+@@ -132,7 +132,7 @@ void StoreWordInTwoHalfwords(u16 *h, u32 w)
+ 
+ void LoadWordFromTwoHalfwords(u16 *h, u32 *w)
+ {
+-    *w = h[0] | (s16)h[1] << 16;
++    *w = h[0] | ((u32)h[1] << 16);
+ }
+ 
+ void SetBgAffineStruct(struct BgAffineSrcData *src, u32 texX, u32 texY, s16 scrX, s16 scrY, s16 sx, s16 sy, u16 alpha)
+diff --git a/src/wild_encounter.c b/src/wild_encounter.c
+index 0656b198..732d6fc9 100644
+--- a/src/wild_encounter.c
++++ b/src/wild_encounter.c
+@@ -16,10 +16,14 @@
+ #include "script.h"
+ #include "tv.h"
+ #include "wild_encounter.h"
++#if WASM
++#include "wasm/run.h"
++#endif
+ #include "constants/abilities.h"
+ #include "constants/game_stat.h"
+ #include "constants/items.h"
+ #include "constants/layouts.h"
++#include "constants/pokedex.h"
+ #include "constants/weather.h"
+ 
+ extern const u8 EventScript_RepelWoreOff[];
+@@ -376,10 +380,29 @@ static u8 PickWildMonNature(void)
+     return Random() % NUM_NATURES;
+ }
+ 
+-static void CreateWildMon(u16 species, u8 level)
++static void NotifyRunWildEncounter(u16 species, u8 level, u32 slotKey)
++{
++#if WASM
++    u32 personality = GetMonData(&gEnemyParty[0], MON_DATA_PERSONALITY);
++    u32 sectionId = WasmRunMapSection();
++    WasmRunOnEncounter(sectionId, sectionId, species, level, personality & 0xffff, personality >> 16, slotKey);
++#else
++    (void)species;
++    (void)level;
++    (void)slotKey;
++#endif
++}
++
++static void CreateWildMon(u16 species, u8 level, u32 slotKey)
+ {
+     bool32 checkCuteCharm;
+ 
++#if WASM
++    species = WasmRunRandomSpecies(WASM_RUN_RANDOM_WILD, species, WasmRunMapSection(), slotKey);
++#else
++    (void)slotKey;
++#endif
++
+     ZeroEnemyPartyMons();
+     checkCuteCharm = TRUE;
+ 
+@@ -408,11 +431,23 @@ static void CreateWildMon(u16 species, u8 level)
+             gender = MON_FEMALE;
+ 
+         CreateMonWithGenderNatureLetter(&gEnemyParty[0], species, level, USE_RANDOM_IVS, gender, PickWildMonNature(), 0);
++        NotifyRunWildEncounter(species, level, slotKey);
+         return;
+     }
+ 
+     CreateMonWithNature(&gEnemyParty[0], species, level, USE_RANDOM_IVS, PickWildMonNature());
++    NotifyRunWildEncounter(species, level, slotKey);
+ }
++
++#if WASM
++u32 WasmRunTestCreateWildMon(u16 originalSpecies, u8 level, u32 slotKey)
++{
++    if (originalSpecies == SPECIES_NONE || originalSpecies > NATIONAL_DEX_COUNT || level == 0 || level > MAX_LEVEL)
++        return FALSE;
++    CreateWildMon(originalSpecies, level, slotKey);
++    return TRUE;
++}
++#endif
+ #ifdef BUGFIX
+ #define TRY_GET_ABILITY_INFLUENCED_WILD_MON_INDEX(wildPokemon, type, ability, ptr, count) TryGetAbilityInfluencedWildMonIndex(wildPokemon, type, ability, ptr, count)
+ #else
+@@ -451,7 +486,8 @@ static bool8 TryGenerateWildMon(const struct WildPokemonInfo *wildMonInfo, u8 ar
+     if (gMapHeader.mapLayoutId != LAYOUT_BATTLE_FRONTIER_BATTLE_PIKE_ROOM_WILD_MONS && flags & WILD_CHECK_KEEN_EYE && !IsAbilityAllowingEncounter(level))
+         return FALSE;
+ 
+-    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level);
++    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level,
++        ((u32)area << 16) | wildMonIndex);
+     return TRUE;
+ }
+ 
+@@ -460,8 +496,9 @@ static u16 GenerateFishingWildMon(const struct WildPokemonInfo *wildMonInfo, u8
+     u8 wildMonIndex = ChooseWildMonIndex_Fishing(rod);
+     u8 level = ChooseWildMonLevel(&wildMonInfo->wildPokemon[wildMonIndex]);
+ 
+-    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level);
+-    return wildMonInfo->wildPokemon[wildMonIndex].species;
++    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level,
++        ((u32)WILD_AREA_FISHING << 16) | ((u32)rod << 8) | wildMonIndex);
++    return GetMonData(&gEnemyParty[0], MON_DATA_SPECIES);
+ }
+ 
+ static bool8 SetUpMassOutbreakEncounter(u8 flags)
+@@ -471,7 +508,8 @@ static bool8 SetUpMassOutbreakEncounter(u8 flags)
+     if (flags & WILD_CHECK_REPEL && !IsWildLevelAllowedByRepel(gSaveBlock1Ptr->outbreakPokemonLevel))
+         return FALSE;
+ 
+-    CreateWildMon(gSaveBlock1Ptr->outbreakPokemonSpecies, gSaveBlock1Ptr->outbreakPokemonLevel);
++    CreateWildMon(gSaveBlock1Ptr->outbreakPokemonSpecies,
++        gSaveBlock1Ptr->outbreakPokemonLevel, 0x40000000);
+     for (i = 0; i < MAX_MON_MOVES; i++)
+         SetMonMoveSlot(&gEnemyParty[0], gSaveBlock1Ptr->outbreakPokemonMoves[i], i);
+ 
+@@ -785,8 +823,8 @@ void FishingWildEncounter(u8 rod)
+     {
+         u8 level = ChooseWildMonLevel(&sWildFeebas);
+ 
+-        species = sWildFeebas.species;
+-        CreateWildMon(species, level);
++        CreateWildMon(sWildFeebas.species, level, ((u32)WILD_AREA_FISHING << 16) | 0xFF);
++        species = GetMonData(&gEnemyParty[0], MON_DATA_SPECIES);
+     }
+     else
+     {
+diff --git a/tools/preproc/c_file.cpp b/tools/preproc/c_file.cpp
+index 1d763b9f..1d3984ca 100644
+--- a/tools/preproc/c_file.cpp
++++ b/tools/preproc/c_file.cpp
+@@ -524,7 +524,7 @@ void CFile::TryConvertIncgfx()
+         RaiseError("exected ')' or ','");
+     }
+ 
+-    // WARNING: This must stay in-sync with 'tools/scaninc/source_file.cpp'.
++    // WARNING: This must stay in sync with encoded_args in tools/generate_wasm_assets.py.
+     std::string arguments_as_path;
+     for (auto c : arguments)
+     {
+@@ -534,7 +534,7 @@ void CFile::TryConvertIncgfx()
+             arguments_as_path += '_';
+     }
+ 
+-    // WARNING: This must stay in-sync with 'tools/scaninc/scaninc.cpp'.
++    // WARNING: This must stay in sync with generate_incgfx in tools/generate_wasm_assets.py.
+     auto converted = m_graphicsRoot + source + arguments_as_path + extensions;
+ 
+     int fileSize;

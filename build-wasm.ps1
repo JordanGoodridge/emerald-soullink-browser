@@ -34,3 +34,11 @@ try {
 }
 
 Write-Host "Built: $repo\build\wasm\pokeemerald.wasm"
+
+$kaizoBuildScript = Join-Path $root 'game-packs\emerald-kaizo\build\build.mjs'
+if (Test-Path $kaizoBuildScript) {
+    & node $kaizoBuildScript
+    if ($LASTEXITCODE -ne 0) {
+        throw "Emerald Kaizo build failed with exit code $LASTEXITCODE"
+    }
+}

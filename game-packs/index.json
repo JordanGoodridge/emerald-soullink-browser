@@ -27,7 +27,7 @@
       "capabilities": {
         "rendering": ["hd2d", "classic"],
         "presence": "readonly",
-        "rules": "none",
+        "rules": "enforce",
         "link": "none",
         "customUi": false
       }

@@ -8,12 +8,16 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const game = resolve(here, '..');
-const repo = resolve(game, '..');
+const defaultGame = resolve(here, '..');
+const repo = resolve(defaultGame, '..');
+const sourceArg = process.argv.slice(2).find((arg) => arg.startsWith('--source='));
+const game = sourceArg ? resolve(sourceArg.slice('--source='.length)) : defaultGame;
+const gameIdArg = process.argv.slice(2).find((arg) => arg.startsWith('--game-id='));
+const gameId = gameIdArg ? gameIdArg.slice('--game-id='.length) : 'emerald';
 const outputArg = process.argv.slice(2).find((arg) => arg.startsWith('--output='));
 const output = outputArg
   ? resolve(outputArg.slice('--output='.length))
-  : join(repo, 'game-packs', 'emerald', 'dist', 'region-map.json');
+  : join(repo, 'game-packs', gameId, 'dist', 'region-map.json');
 
 const sectionsPath = join(game, 'src', 'data', 'region_map', 'region_map_sections.json');
 const constantsPath = join(game, 'include', 'constants', 'region_map_sections.h');
@@ -60,7 +64,7 @@ if (layout.length !== 15) throw new Error(`region map has ${layout.length} rows;
 
 const outputData = {
   schemaVersion: 1,
-  gameId: 'emerald',
+  gameId,
   dimensions: { columns: 28, rows: 15 },
   image: { url: 'resources/hoenn-region-map.png', width: 1507, height: 990 },
   sections,
