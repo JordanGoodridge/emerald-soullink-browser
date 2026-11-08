@@ -135,6 +135,65 @@ test('changing a single clothing slot modifies only that slot vertical region ac
   assert.ok(vestDiffs > 0, 'expected sleeveless vest to modify sleeve pixels');
 });
 
+test('custom headwear (kitten-ears, wizard-hat, royal-crown, dojo-headband) and accessories compile cleanly', () => {
+  const vanilla = compileCharacterCustomization({}, { gameId: 'emerald' });
+  const sheetWidth = 144;
+
+  for (const headId of ['kitten-ears', 'wizard-hat', 'royal-crown', 'dojo-headband']) {
+    const compiled = compileCharacterCustomization({
+      equipped: { head: headId },
+    }, { gameId: 'emerald' });
+    let headDiffs = 0;
+    for (let y = 0; y <= 21; y++) {
+      for (let x = 0; x < sheetWidth; x++) {
+        if (compiled.walkingIndexed[y * sheetWidth + x] !== vanilla.walkingIndexed[y * sheetWidth + x]) {
+          headDiffs++;
+        }
+      }
+    }
+    assert.ok(headDiffs > 0, `expected ${headId} to modify head silhouette pixels`);
+    // Torso and bottom rows remain untouched when accessory is 'none':
+    for (let y = 22; y <= 31; y++) {
+      for (let x = 0; x < sheetWidth; x++) {
+        assert.equal(compiled.walkingIndexed[y * sheetWidth + x], vanilla.walkingIndexed[y * sheetWidth + x]);
+      }
+    }
+  }
+
+  // Combining Kitten Ears + Kitty Nose & Whiskers + Sakura Pink color swatch:
+  const neko = compileCharacterCustomization({
+    equipped: {
+      head: 'kitten-ears',
+      accessory: 'cat-whiskers',
+    },
+    colors: {
+      head: '#ff94c2',
+    },
+  }, { gameId: 'emerald' });
+  const earsOnly = compileCharacterCustomization({
+    equipped: { head: 'kitten-ears' },
+  }, { gameId: 'emerald' });
+
+  let whiskerDiffs = 0;
+  for (let i = 0; i < neko.walkingIndexed.length; i++) {
+    if (neko.walkingIndexed[i] !== earsOnly.walkingIndexed[i]) whiskerDiffs++;
+  }
+  assert.ok(whiskerDiffs > 0, 'expected cat-whiskers accessory to add nose/whisker pixels');
+  assert.deepEqual(neko.paletteRgb[14], [255, 148, 194]);
+
+  // Verify cool-shades, angel-halo, and hero-scarf accessories each apply distinct overlays:
+  for (const accId of ['cool-shades', 'angel-halo', 'hero-scarf']) {
+    const withAcc = compileCharacterCustomization({
+      equipped: { accessory: accId },
+    }, { gameId: 'emerald' });
+    let accDiffs = 0;
+    for (let i = 0; i < withAcc.walkingIndexed.length; i++) {
+      if (withAcc.walkingIndexed[i] !== vanilla.walkingIndexed[i]) accDiffs++;
+    }
+    assert.ok(accDiffs > 0, `expected accessory ${accId} to modify sprite pixels`);
+  }
+});
+
 test('multi-game catalog supports per-game clothing extensions and new protagonist rigs', () => {
   // Extend gen3-brendan specifically for emerald-kaizo without polluting vanilla emerald:
   extendCharacterRigForGame('emerald-kaizo', 'gen3-brendan', {

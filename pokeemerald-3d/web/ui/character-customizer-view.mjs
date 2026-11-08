@@ -91,6 +91,7 @@ export function createCharacterCustomizerView({
   const rotateRightButton = doc?.querySelector?.('#customizer-rotate-right');
   const motionWalkButton = doc?.querySelector?.('#customizer-motion-walk');
   const motionRunButton = doc?.querySelector?.('#customizer-motion-run');
+  const slotTabsContainer = doc?.querySelector?.('#customizer-slot-tabs');
   const slotsContainer = doc?.querySelector?.('#customizer-clothing-slots');
   const aspectTabsContainer = doc?.querySelector?.('#customizer-color-tabs');
   const swatchesContainer = doc?.querySelector?.('#customizer-color-swatches');
@@ -108,6 +109,7 @@ export function createCharacterCustomizerView({
     schema,
   });
 
+  let activeSlotId = schema.clothingSlots?.[0]?.id ?? 'head';
   let activeAspectId = schema.colorAspects?.[0]?.id ?? 'top';
   let directionIndex = 0;
   let motion = 'walk';
@@ -157,16 +159,111 @@ export function createCharacterCustomizerView({
   }
 
   function renderSlots() {
+    const slots = schema.clothingSlots ?? [];
+    if (!slots.some((entry) => entry.id === activeSlotId)) {
+      activeSlotId = slots[0]?.id ?? '';
+    }
+
+    if (slotTabsContainer) {
+      slotTabsContainer.replaceChildren();
+      for (const slot of slots) {
+        const items = slot.items ?? [];
+        const equippedId = customization.equipped?.[slot.id] ?? slot.defaultItemId;
+        const equippedItem = items.find((entry) => entry.id === equippedId) ?? items[0];
+        const isActive = slot.id === activeSlotId;
+
+        const tab = doc.createElement('button');
+        tab.type = 'button';
+        tab.className = `customizer-slot-tab${isActive ? ' is-active' : ''}`;
+        tab.dataset.slotTab = slot.id;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', String(isActive));
+
+        const slotTitle = doc.createElement('span');
+        slotTitle.className = 'customizer-slot-tab-label';
+        slotTitle.textContent = slot.label;
+
+        const equippedBadge = doc.createElement('small');
+        equippedBadge.className = 'customizer-slot-tab-value';
+        equippedBadge.textContent = equippedItem?.label ?? '';
+
+        tab.append(slotTitle, equippedBadge);
+        tab.addEventListener('click', () => {
+          activeSlotId = slot.id;
+          renderSlots();
+        });
+        slotTabsContainer.append(tab);
+      }
+    }
+
     if (!slotsContainer) return;
     slotsContainer.replaceChildren();
 
-    for (const slot of schema.clothingSlots ?? []) {
-      const group = doc.createElement('div');
-      group.className = 'customizer-slot-group';
+    for (const slot of slots) {
+      const items = slot.items ?? [];
+      const equippedId = customization.equipped?.[slot.id] ?? slot.defaultItemId;
+      const equippedIndex = Math.max(0, items.findIndex((entry) => entry.id === equippedId));
+      const equippedItem = items[equippedIndex] ?? items[0];
+      const isActiveSlot = slot.id === activeSlotId;
 
-      const heading = doc.createElement('h4');
+      const group = doc.createElement('div');
+      group.className = `customizer-slot-group${isActiveSlot ? ' is-active' : ' is-collapsed'}`;
+      group.dataset.slotGroup = slot.id;
+      if (!isActiveSlot) {
+        group.setAttribute('hidden', 'hidden');
+      }
+
+      const heading = doc.createElement('div');
       heading.className = 'customizer-slot-heading';
-      heading.textContent = slot.label;
+
+      const headingMeta = doc.createElement('div');
+      headingMeta.className = 'customizer-slot-meta';
+
+      const headingTitle = doc.createElement('strong');
+      headingTitle.className = 'customizer-slot-title';
+      headingTitle.textContent = `${slot.label}: ${equippedItem?.label ?? ''}`;
+      headingMeta.append(headingTitle);
+
+      if (equippedItem?.description) {
+        const headingDesc = doc.createElement('span');
+        headingDesc.className = 'customizer-slot-active-desc';
+        headingDesc.textContent = equippedItem.description;
+        headingMeta.append(headingDesc);
+      }
+
+      const stepper = doc.createElement('div');
+      stepper.className = 'customizer-slot-stepper';
+
+      const prevBtn = doc.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'customizer-stepper-btn';
+      prevBtn.dataset.slotCycle = 'prev';
+      prevBtn.setAttribute('aria-label', `Previous ${slot.label}`);
+      prevBtn.textContent = '◀';
+      prevBtn.addEventListener('click', () => {
+        if (!items.length) return;
+        const prevIdx = (equippedIndex + items.length - 1) % items.length;
+        selectClothingItem(slot.id, items[prevIdx].id);
+      });
+
+      const countBadge = doc.createElement('span');
+      countBadge.className = 'customizer-stepper-count';
+      countBadge.textContent = `${equippedIndex + 1} / ${items.length}`;
+
+      const nextBtn = doc.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'customizer-stepper-btn';
+      nextBtn.dataset.slotCycle = 'next';
+      nextBtn.setAttribute('aria-label', `Next ${slot.label}`);
+      nextBtn.textContent = '▶';
+      nextBtn.addEventListener('click', () => {
+        if (!items.length) return;
+        const nextIdx = (equippedIndex + 1) % items.length;
+        selectClothingItem(slot.id, items[nextIdx].id);
+      });
+
+      stepper.append(prevBtn, countBadge, nextBtn);
+      heading.append(headingMeta, stepper);
       group.append(heading);
 
       const optionsRow = doc.createElement('div');
@@ -174,8 +271,7 @@ export function createCharacterCustomizerView({
       optionsRow.setAttribute('role', 'group');
       optionsRow.setAttribute('aria-label', slot.label);
 
-      const equippedId = customization.equipped?.[slot.id] ?? slot.defaultItemId;
-      for (const item of slot.items ?? []) {
+      for (const item of items) {
         const btn = doc.createElement('button');
         btn.type = 'button';
         const isSelected = item.id === equippedId;
@@ -183,6 +279,9 @@ export function createCharacterCustomizerView({
         btn.dataset.clothingSlot = slot.id;
         btn.dataset.clothingItem = item.id;
         btn.setAttribute('aria-pressed', String(isSelected));
+        if (item.description) {
+          btn.title = item.description;
+        }
 
         const title = doc.createElement('strong');
         title.textContent = item.label;
@@ -305,6 +404,7 @@ export function createCharacterCustomizerView({
   }
 
   function selectClothingItem(slotId, itemId) {
+    activeSlotId = slotId;
     return commitCustomization({
       ...customization,
       equipped: {

@@ -84,6 +84,7 @@ function createMockDom() {
     ['#customizer-rotate-right', createMockElement('button', 'customizer-rotate-right')],
     ['#customizer-motion-walk', createMockElement('button', 'customizer-motion-walk')],
     ['#customizer-motion-run', createMockElement('button', 'customizer-motion-run')],
+    ['#customizer-slot-tabs', createMockElement('div', 'customizer-slot-tabs')],
     ['#customizer-clothing-slots', createMockElement('div', 'customizer-clothing-slots')],
     ['#customizer-color-tabs', createMockElement('div', 'customizer-color-tabs')],
     ['#customizer-color-swatches', createMockElement('div', 'customizer-color-swatches')],
@@ -141,6 +142,33 @@ test('character customizer view opens from Main Menu, switches clothing & colors
   assert.equal(view.getCustomization().equipped.top, 'rs-jacket');
   assert.equal(events.length, 1);
   assert.equal(bySelector.get('#customizer-reset').disabled, false);
+
+  // Select Kitten Ears in the 'head' slot and Kitty Nose & Whiskers in the 'accessory' slot:
+  const headSlotGroup = bySelector.get('#customizer-clothing-slots').children[0];
+  const kittenEarsBtn = headSlotGroup.children[1].children.find(
+    (btn) => btn.dataset.clothingItem === 'kitten-ears',
+  );
+  assert.ok(kittenEarsBtn);
+  kittenEarsBtn.click();
+  assert.equal(view.getCustomization().equipped.head, 'kitten-ears');
+
+  const accessorySlotGroup = bySelector.get('#customizer-clothing-slots').children[3];
+  const whiskersBtn = accessorySlotGroup.children[1].children.find(
+    (btn) => btn.dataset.clothingItem === 'cat-whiskers',
+  );
+  assert.ok(whiskersBtn);
+  whiskersBtn.click();
+  assert.equal(view.getCustomization().equipped.accessory, 'cat-whiskers');
+
+  // Verify only the active slot group ('accessory') is visible while others are collapsed:
+  const slotGroups = bySelector.get('#customizer-clothing-slots').children;
+  assert.equal(slotGroups[3].getAttribute('hidden'), null);
+  assert.equal(slotGroups[0].getAttribute('hidden'), 'hidden');
+
+  // Clicking the next stepper button (▶) on 'accessory' cycles to 'cool-shades':
+  const accStepperNext = slotGroups[3].children[0].children[1].children[2];
+  accStepperNext.click();
+  assert.equal(view.getCustomization().equipped.accessory, 'cool-shades');
 
   // Switch color tab to 'accent' (Bandana & Bag) and click Ruby Gold swatch:
   const accentTab = bySelector.get('#customizer-color-tabs').children.find(
