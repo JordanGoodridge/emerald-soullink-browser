@@ -141,9 +141,9 @@ function getFrameHeadMetrics(frameIndex, kind = 'walkingIndexed') {
   const isStep = frameIndex >= 3;
   const isRun = kind === 'runningIndexed';
   const topDy = (isRun ? 1 : 0) + (isStep ? 1 : 0);
-  const browDy = topDy + (isRun && dir === 'down' ? 1 : 0);
+  const eyeDy = topDy + (isRun && dir === 'down' ? 1 : 0);
   const dx = isRun && dir === 'left' ? -2 : 0;
-  return { dir, isStep, isRun, topDy, browDy, dx };
+  return { dir, isStep, isRun, topDy, eyeDy, dx };
 }
 
 // Stamps a 16-char pattern string ('.' = transparent/clear when clearDots=true,
@@ -172,16 +172,14 @@ function stampFrameRow(indexed, width, height, frameIndex, y, pattern, {
 }
 
 function stampDirectionalRows(indexed, width, height, kind, rowsByDir, {
-  anchor = 'top',
   clearDots = true,
 } = {}) {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
-    const { dir, topDy, browDy, dx } = getFrameHeadMetrics(f, kind);
-    const dy = anchor === 'brow' ? browDy : topDy;
+    const { dir, eyeDy, dx } = getFrameHeadMetrics(f, kind);
     const rows = rowsByDir[dir] ?? rowsByDir.down ?? [];
     for (const [baseY, pattern] of rows) {
-      stampFrameRow(indexed, width, height, f, baseY + dy, pattern, {
+      stampFrameRow(indexed, width, height, f, baseY + eyeDy, pattern, {
         dx,
         clearDots,
       });
@@ -189,39 +187,52 @@ function stampDirectionalRows(indexed, width, height, kind, rowsByDir, {
   }
 }
 
-// Kitten Ears headband transform: replaces the asymmetrical single-horn cap peak
-// with two perked-up triangular cat ears featuring inner pink/coral ear tufts
-// (index 12 = C) and outer Hat/Hair fur (indices 14 = E, 9 = 9).
+// Kitten Ears transform: removes the bulky white cap and green headband,
+// lowering the crown roof to row 14 so two tall, unmistakable 4px triangular
+// cat ears (with pink inner ear tufts C and Hat/Hair outer fur E/9) rise
+// cleanly above sleek dark hair (indices 5/8) and parted bangs.
 function applyKittenEarsTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
-      [9,  '...5........5...'],
-      [10, '..5E5......5E5..'],
-      [11, '.5ECE5....5ECE5.'],
-      [12, '.5EC95555559CE5.'],
-      [13, '..59EEEEEEEE95..'],
-      [14, '...59EEEEEE95...'],
+      [9,  '................'],
+      [10, '..55........55..'],
+      [11, '.5EE5......5EE5.'],
+      [12, '.5ECE5....5ECE5.'],
+      [13, '.5ECCE5555ECCE5.'],
+      [14, '..59EEEEEEEE95..'],
+      [15, '..F5888888885F..'],
+      [16, '..F8858888588F..'],
+      [17, '.43888111188834.'],
     ],
     up: [
-      [9,  '...5........5...'],
-      [10, '..5E5......5E5..'],
-      [11, '.5E9E5....5E9E5.'],
-      [12, '.59995555559995.'],
-      [13, '..599EEEEEE995..'],
-      [14, '...59EEEEEEE5...'],
+      [9,  '................'],
+      [10, '..55........55..'],
+      [11, '.5EE5......5EE5.'],
+      [12, '.5E9E5....5E9E5.'],
+      [13, '.5999E5555E9995.'],
+      [14, '..599EEEEEE995..'],
+      [15, '..F5888888885F..'],
+      [16, '..F8858888588F..'],
+      [17, '..F8888888888F..'],
+      [18, '.43F88588588F34.'],
+      [19, '.43488888888434.'],
     ],
     left: [
-      [9,  '....5...5.......'],
-      [10, '...5E5.5E5......'],
-      [11, '..5EC55ECE5.....'],
-      [12, '..5995ECE9955...'],
-      [13, '...55EE9999955..'],
+      [9,  '................'],
+      [10, '...55...55......'],
+      [11, '..5EE5.5EE5.....'],
+      [12, '..5EC5.5ECE5....'],
+      [13, '..59955ECCE95...'],
+      [14, '..59EEEEEEEE95..'],
+      [15, '..F5888888885F..'],
+      [16, '..F8858888888F..'],
+      [17, '..48888888888F..'],
     ],
-  }, { anchor: 'top', clearDots: true });
+  }, { clearDots: true });
 }
 
-// Mystic Wizard Hat transform: sculpts a tall curved spellcaster spire,
-// an accent ribbon band with a center clasp, and a wide flared brim.
+// Mystic Wizard Hat transform: tall curved spellcaster spire, accent ribbon band
+// with a center clasp, and a wide 16px flared brim sitting right above the eyes.
 function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
@@ -234,8 +245,9 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
       [12, '...5EEEEEEE995..'],
       [13, '...59999999995..'],
       [14, '..5AAABEEBAAA5..'],
-      [15, '.F5EEEEEEEEEE5F.'],
-      [16, 'FF9999EEEE9999FF'],
+      [15, '..5BBBBEEBBBB5..'],
+      [16, '.F5EEEEEEEEEE5F.'],
+      [17, 'FF9999EEEE9999FF'],
     ],
     up: [
       [6,  '.....55.........'],
@@ -246,9 +258,10 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
       [11, '..599EEEEEE5....'],
       [12, '..599EEEEEEE5...'],
       [13, '..59999999995...'],
-      [14, '..5BBBBBBBBBB5..'],
-      [15, '.F599EEEEEE995F.'],
-      [16, 'FF999999999999FF'],
+      [14, '..5AAAAAAAAAA5..'],
+      [15, '..5BBBBBBBBBB5..'],
+      [16, '.F599EEEEEE995F.'],
+      [17, 'FF999999999999FF'],
     ],
     left: [
       [6,  '..........55....'],
@@ -260,149 +273,179 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
       [12, '...5EEEEEEEE995.'],
       [13, '...599999999995.'],
       [14, '..5AAAAAAAAAAA5.'],
-      [15, '.F5EEEEEEEEEEE5F'],
-      [16, 'FF999999999999FF'],
+      [15, '..5BBBBBBBBBBB5.'],
+      [16, '.F5EEEEEEEEEEE5F'],
+      [17, 'FF999999999999FF'],
     ],
-  }, { anchor: 'top', clearDots: true });
+  }, { clearDots: true });
 }
 
-// Champion Crown transform: three-spiked royal coronet with a ruby/accent jewel
-// in the center crest over a sleek rounded crown.
+// Champion Crown transform: removes the vanilla white cap and green headband,
+// placing a three-spiked royal coronet with a ruby center jewel directly atop
+// natural dark hair (indices 5/8) and parted forehead bangs.
 function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
-      [9,  '...5...55...5...'],
-      [10, '..5A5.5AA5.5A5..'],
-      [11, '..5A55AAAA55A5..'],
-      [12, '..5AAACCCAAA55..'],
-      [13, '..5BBBBBBBBBB5..'],
-      [14, '...59EEEEEE95...'],
+      [9,  '................'],
+      [10, '................'],
+      [11, '..5....55....5..'],
+      [12, '.5E5..5EE5..5E5.'],
+      [13, '.5AA55AAAA55AA5.'],
+      [14, '..5AAACCCCAAA5..'],
+      [15, '..FBBBBBBBBBBF..'],
+      [16, '..F8858888588F..'],
+      [17, '.43888111188834.'],
     ],
     up: [
-      [9,  '...5...55...5...'],
-      [10, '..5A5.5AA5.5A5..'],
-      [11, '..5A55AAAA55A5..'],
-      [12, '..5AAAAAAAAAA5..'],
-      [13, '..5BBBBBBBBBB5..'],
-      [14, '...59EEEEEEE5...'],
+      [9,  '................'],
+      [10, '................'],
+      [11, '..5....55....5..'],
+      [12, '.5E5..5EE5..5E5.'],
+      [13, '.5AA55AAAA55AA5.'],
+      [14, '..5AAAAAAAAAA5..'],
+      [15, '..FBBBBBBBBBBF..'],
+      [16, '..F8858888588F..'],
+      [17, '..F8888888888F..'],
+      [18, '.43F88588588F34.'],
+      [19, '.43488888888434.'],
     ],
     left: [
-      [9,  '...5...5....5...'],
-      [10, '..5A5.5A5..5A5..'],
-      [11, '..5AA5AAA55AA5..'],
-      [12, '..5ACAAAAAAA95..'],
-      [13, '..5BBBBBBBBBB5..'],
-      [14, '..55AEEEEE99995.'],
+      [9,  '................'],
+      [10, '................'],
+      [11, '..5...5....5....'],
+      [12, '.5E5.5E5..5E5...'],
+      [13, '.5AA5AAA55AA5...'],
+      [14, '..5ACAAAAAAA5...'],
+      [15, '..FBBBBBBBBBF...'],
+      [16, '..F8858888888F..'],
+      [17, '..48888888888F..'],
     ],
-  }, { anchor: 'top', clearDots: true });
+  }, { clearDots: true });
 }
 
-// Dojo Headband transform: trims the tall cap spike into a lower rounded hair
-// silhouette with a tied martial-arts headband and trailing knot tails.
+// Dojo Headband transform: replaces the white cap with spiky natural dark hair
+// (indices 5/8) and wraps a clean 2-row martial-arts headband (A/B) with a
+// back knot and trailing tails.
 function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
+      [9,  '................'],
       [10, '................'],
-      [11, '................'],
-      [12, '....55555555....'],
-      [13, '...5EEEEEEEE5...'],
-      [14, '...59EEEEEE95...'],
+      [11, '.....55..55.....'],
+      [12, '...5588558855...'],
+      [13, '..588588885885..'],
+      [14, '..588888888885..'],
+      [15, '..FAAAAAAAAAAF..'],
+      [16, '..FBBBBBBBBBBF..'],
+      [17, '.43888111188834.'],
     ],
     up: [
+      [9,  '................'],
       [10, '................'],
-      [11, '................'],
-      [12, '....55555555....'],
-      [13, '...599EEEE995...'],
-      [14, '...59EEEEEE95...'],
-      [15, '..5AAAABBBAAAA5.'],
-      [16, '..F999BAAB999F..'],
+      [11, '.....55..55.....'],
+      [12, '...5588558855...'],
+      [13, '..588588885885..'],
+      [14, '..588888888885..'],
+      [15, '..FAAAAFFAAAAF..'],
+      [16, '..FBBBBAABBBBF..'],
+      [17, '..F888BAAB888F..'],
+      [18, '.43F88B88B88F34.'],
+      [19, '.43488888888434.'],
     ],
     left: [
+      [9,  '................'],
       [10, '................'],
-      [11, '................'],
-      [12, '....55555555....'],
-      [13, '...5EEEEEEEE55..'],
-      [14, '..55AEEEEE9995A5'],
-      [15, '..8EEAA9999995B5'],
+      [11, '....55..55......'],
+      [12, '..5588558855....'],
+      [13, '..58858888885...'],
+      [14, '..58888888885...'],
+      [15, '..FAAAAAAAAAA5A5'],
+      [16, '..FBBBBBBBBBB5B5'],
+      [17, '..48888888888F..'],
     ],
-  }, { anchor: 'top', clearDots: true });
+  }, { clearDots: true });
 }
 
-// Kitty Nose & Whiskers accessory overlay: adds a cute pink nose and cheek
-// whiskers on the face rows without clearing surrounding hair/face pixels.
+// Kitty Nose & Whiskers accessory overlay: places a 2px pink button nose right
+// between the eyes (x=7..8) and dark whisker ticks on the outer cheeks.
 function applyCatWhiskersAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
-  stampDirectionalRows(indexed, width, height, kind, {
-    down: [
-      [20, '  8  C CC C  8  '],
-    ],
-    up: [],
-    left: [
-      [20, '  C  8  8       '],
-    ],
-  }, { anchor: 'brow', clearDots: false });
-}
-
-// Squirtle Squad Shades accessory overlay: sharp dark pixel sunglasses with a
-// bright white lens glint across the eye rows.
-function applyCoolShadesAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
-  stampDirectionalRows(indexed, width, height, kind, {
-    down: [
-      [18, '   FFFFFFFFFF   '],
-      [19, '   FE88FF88EF   '],
-      [20, '    FFF  FFF    '],
-    ],
-    up: [],
-    left: [
-      [18, '  FFFFFFF       '],
-      [19, '  FE88F         '],
-    ],
-  }, { anchor: 'brow', clearDots: false });
-}
-
-// Floating Halo accessory overlay: luminous ring hovering above the head
-// (positioned at base rows 2..4 so it floats cleanly above even the tallest hat).
-function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
-  stampDirectionalRows(indexed, width, height, kind, {
-    down: [
-      [2, '    5EEEEEE5    '],
-      [3, '   5E99..99E5   '],
-      [4, '    5EEEEEE5    '],
-    ],
-    up: [
-      [2, '    5EEEEEE5    '],
-      [3, '   5E99..99E5   '],
-      [4, '    5EEEEEE5    '],
-    ],
-    left: [
-      [2, '   5EEEEEE5     '],
-      [3, '  5E99..99E5    '],
-      [4, '   5EEEEEE5     '],
-    ],
-  }, { anchor: 'top', clearDots: true });
-}
-
-// Champion Scarf accessory overlay: wraps an accent scarf around the collar
-// with a trailing scarf tail on the back and side.
-function applyHeroScarfAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
-    const { dir, isRun } = getFrameHeadMetrics(f, kind);
-    const dy = isRun ? 1 : 0;
+    const { dir, isRun, topDy, dx } = getFrameHeadMetrics(f, kind);
     if (dir === 'down') {
-      stampFrameRow(indexed, width, height, f, 21 + dy, '   5AAAAAAA5    ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 22 + dy, '   5BBBBAAAB5   ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 23 + dy, '        5AB5    ', { clearDots: false });
-    } else if (dir === 'up') {
-      stampFrameRow(indexed, width, height, f, 21 + dy, '   5AAAAAAA5    ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 22 + dy, '   5BBBBAAAB5   ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 23 + dy, '       5AAB5    ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 24 + dy, '       5BB5     ', { clearDots: false });
-    } else {
-      stampFrameRow(indexed, width, height, f, 21 + dy, '   5AAAAAAA5    ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 22 + dy, '    5BBBBAAAB5  ', { clearDots: false });
-      stampFrameRow(indexed, width, height, f, 23 + dy, '         5AABB5 ', { clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  F    CC    F  ', { dx, clearDots: false });
+      if (isRun) {
+        stampFrameRow(indexed, width, height, f, 21 + topDy, '      2  2      ', { dx, clearDots: false });
+      }
+    } else if (dir === 'left') {
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  C   F         ', { dx, clearDots: false });
     }
   }
+}
+
+// Squirtle Squad Shades accessory overlay: sleek 2-row dark sunglasses across
+// the eye rows with a visible nose bridge (11), white lens glint (E), and exposed chin below.
+function applyCoolShadesAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
+  const frames = Math.floor(width / 16);
+  for (let f = 0; f < frames; f++) {
+    const { dir, isRun, topDy, dx } = getFrameHeadMetrics(f, kind);
+    if (dir === 'down') {
+      stampFrameRow(indexed, width, height, f, 19 + topDy, '  FFFFFFFFFFFF  ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '   FE8F11FE8F   ', { dx, clearDots: false });
+      if (isRun) {
+        stampFrameRow(indexed, width, height, f, 21 + topDy, '      2  2      ', { dx, clearDots: false });
+      }
+    } else if (dir === 'left') {
+      stampFrameRow(indexed, width, height, f, 19 + topDy, '  FFFFFFF       ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  FE8F          ', { dx, clearDots: false });
+    }
+  }
+}
+
+// Floating Halo accessory overlay: delicate 2-row luminous ring hovering just
+// above the head (automatically lifts higher if a tall spire like wizard-hat is worn).
+function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
+  const frames = Math.floor(width / 16);
+  for (let f = 0; f < frames; f++) {
+    const { dir, eyeDy, dx } = getFrameHeadMetrics(f, kind);
+    const fx = f * 16;
+    let hasTallSpire = false;
+    const checkY = 8 + eyeDy;
+    if (checkY >= 0 && checkY < height) {
+      for (let x = 4; x < 12; x++) {
+        if (indexed[checkY * width + fx + x] !== 0) {
+          hasTallSpire = true;
+          break;
+        }
+      }
+    }
+    const baseY = (hasTallSpire ? 3 : 7) + eyeDy;
+    const shiftX = dx + (dir === 'left' ? -1 : 0);
+    stampFrameRow(indexed, width, height, f, baseY, '    5EEEEEE5    ', { dx: shiftX, clearDots: true });
+    stampFrameRow(indexed, width, height, f, baseY + 1, '   5E99..99E5   ', { dx: shiftX, clearDots: true });
+  }
+}
+
+// Champion Scarf accessory overlay: wraps an accent scarf around the neck and
+// collar (rows 22..23 + topDy, below the chin at row 21 + topDy) with a trailing tail.
+function applyHeroScarfAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
+  stampDirectionalRows(indexed, width, height, kind, {
+    down: [
+      [22, '   5AAAAAAAA5   '],
+      [23, '   5BBBBAAAB5   '],
+      [24, '        5AB5    '],
+    ],
+    up: [
+      [22, '   5AAAAAAAA5   '],
+      [23, '   5BBBBAAAB5   '],
+      [24, '       5AAB5    '],
+    ],
+    left: [
+      [22, '   5AAAAAAA5    '],
+      [23, '    5BBBBAAAB5  '],
+      [24, '         5AABB5 '],
+    ],
+  }, { clearDots: false });
 }
 
 function createGen3BrendanRig() {
