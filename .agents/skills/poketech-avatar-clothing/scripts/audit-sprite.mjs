@@ -14,7 +14,7 @@ import {
   compileCharacterCustomization,
 } from '../../../../pokeemerald-3d/web/customization/character-compositor.mjs';
 import {
-  createDefaultCustomization,
+  normalizeCustomization,
 } from '../../../../pokeemerald-3d/web/customization/character-store.mjs';
 
 const args = process.argv.slice(2);
@@ -29,7 +29,7 @@ const sheetName = getArg('--sheet', 'walking');
 const maxFrames = Number(getArg('--frames', '3'));
 
 const schema = resolveCharacterSchema({ rigId: 'gen3-brendan' });
-const custom = createDefaultCustomization(schema);
+const custom = normalizeCustomization({}, schema);
 if (slot && item) {
   custom.slots[slot] = item;
 }
