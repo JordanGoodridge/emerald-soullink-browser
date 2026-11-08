@@ -192,6 +192,22 @@ test('custom headwear (kitten-ears, wizard-hat, royal-crown, dojo-headband) and 
     }
     assert.ok(accDiffs > 0, `expected accessory ${accId} to modify sprite pixels`);
   }
+
+  // Verify changing Shirt & Shoes ('top') or Pants ('bottom') never changes head/ear/nose RGBA pixels:
+  const baseNeko = compileCharacterCustomization({
+    equipped: { head: 'kitten-ears', accessory: 'cat-whiskers' },
+  }, { gameId: 'emerald' });
+  const blueShirtKhakiPantsNeko = compileCharacterCustomization({
+    equipped: { head: 'kitten-ears', accessory: 'cat-whiskers' },
+    colors: { top: '#4a8cff', bottom: '#b59c6b' },
+  }, { gameId: 'emerald' });
+  for (let i = 0; i < 21 * sheetWidth * 4; i++) {
+    assert.equal(
+      blueShirtKhakiPantsNeko.walkingRgba[i],
+      baseNeko.walkingRgba[i],
+      `head/ear RGBA byte ${i} should not change when Shirt or Pants colors change`,
+    );
+  }
 });
 
 test('multi-game catalog supports per-game clothing extensions and new protagonist rigs', () => {

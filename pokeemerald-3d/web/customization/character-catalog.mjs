@@ -189,152 +189,152 @@ function stampDirectionalRows(indexed, width, height, kind, rowsByDir, {
 
 // Kitten Ears transform: removes the bulky white cap and green headband,
 // lowering the crown roof to row 14 so two tall, unmistakable 4px triangular
-// cat ears (with pink inner ear tufts C and Hat/Hair outer fur E/9) rise
-// cleanly above sleek dark hair (indices 5/8) and parted bangs.
+// cat ears rise cleanly above sleek dark hair (index 8) and parted bangs.
+// Uses only F/8 (fixed dark outlines/hair), E/9 (Hat / Hair color), and 3 (warm
+// rosy inner-ear tone) so Shirt & Shoes (C/D) and Pants (5/6/7) never bleed in.
 function applyKittenEarsTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
       [9,  '................'],
-      [10, '..55........55..'],
-      [11, '.5EE5......5EE5.'],
-      [12, '.5ECE5....5ECE5.'],
-      [13, '.5ECCE5555ECCE5.'],
-      [14, '..59EEEEEEEE95..'],
-      [15, '..F5888888885F..'],
-      [16, '..F8858888588F..'],
+      [10, '..88........88..'],
+      [11, '.8EE8......8EE8.'],
+      [12, '.8E3E8....8E3E8.'],
+      [13, '.8E33E8888E33E8.'],
+      [14, '..89EEEEEEEE98..'],
+      [15, '..F8888888888F..'],
+      [16, '..F8888888888F..'],
       [17, '.43888111188834.'],
     ],
     up: [
       [9,  '................'],
-      [10, '..55........55..'],
-      [11, '.5EE5......5EE5.'],
-      [12, '.5E9E5....5E9E5.'],
-      [13, '.5999E5555E9995.'],
-      [14, '..599EEEEEE995..'],
-      [15, '..F5888888885F..'],
-      [16, '..F8858888588F..'],
+      [10, '..88........88..'],
+      [11, '.8EE8......8EE8.'],
+      [12, '.8E9E8....8E9E8.'],
+      [13, '.8999E8888E9998.'],
+      [14, '..899EEEEEE998..'],
+      [15, '..F8888888888F..'],
+      [16, '..F8888888888F..'],
       [17, '..F8888888888F..'],
-      [18, '.43F88588588F34.'],
+      [18, '.43F88888888F34.'],
       [19, '.43488888888434.'],
     ],
     left: [
       [9,  '................'],
-      [10, '...55...55......'],
-      [11, '..5EE5.5EE5.....'],
-      [12, '..5EC5.5ECE5....'],
-      [13, '..59955ECCE95...'],
-      [14, '..59EEEEEEEE95..'],
-      [15, '..F5888888885F..'],
-      [16, '..F8858888888F..'],
+      [10, '...88...88......'],
+      [11, '..8EE8.8EE8.....'],
+      [12, '..8E38.8E3E8....'],
+      [13, '..89988E33E98...'],
+      [14, '..89EEEEEEEE98..'],
+      [15, '..F8888888888F..'],
+      [16, '..F8888888888F..'],
       [17, '..48888888888F..'],
     ],
   }, { clearDots: true });
 }
 
-// Mystic Wizard Hat transform: tall curved spellcaster spire, accent ribbon band
-// with a center clasp, and a wide 16px flared brim sitting right above the eyes.
+// Mystic Wizard Hat transform: tall curved spellcaster spire (E/9 Hat color),
+// accent ribbon band (A/B Bandana & Bag color) with a center clasp, and a wide
+// 16px flared brim using fixed dark outlines (8/F) instead of Pants index 5.
 function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
-      [6,  '.........55.....'],
-      [7,  '........5EE5....'],
-      [8,  '.......5EEE95...'],
-      [9,  '......5EEEE95...'],
-      [10, '.....5EEEEE95...'],
-      [11, '....5EEEEEE995..'],
-      [12, '...5EEEEEEE995..'],
-      [13, '...59999999995..'],
-      [14, '..5AAABEEBAAA5..'],
-      [15, '..5BBBBEEBBBB5..'],
-      [16, '.F5EEEEEEEEEE5F.'],
+      [6,  '.........88.....'],
+      [7,  '........8EE8....'],
+      [8,  '.......8EEE98...'],
+      [9,  '......8EEEE98...'],
+      [10, '.....8EEEEE98...'],
+      [11, '....8EEEEEE998..'],
+      [12, '...8EEEEEEE998..'],
+      [13, '...89999999998..'],
+      [14, '..8AAABEEBAAA8..'],
+      [15, '..8BBBBEEBBBB8..'],
+      [16, '.F8EEEEEEEEEE8F.'],
       [17, 'FF9999EEEE9999FF'],
     ],
     up: [
-      [6,  '.....55.........'],
-      [7,  '....5EE5........'],
-      [8,  '...59EEE5.......'],
-      [9,  '...59EEEE5......'],
-      [10, '...59EEEEE5.....'],
-      [11, '..599EEEEEE5....'],
-      [12, '..599EEEEEEE5...'],
-      [13, '..59999999995...'],
-      [14, '..5AAAAAAAAAA5..'],
-      [15, '..5BBBBBBBBBB5..'],
-      [16, '.F599EEEEEE995F.'],
+      [6,  '.....88.........'],
+      [7,  '....8EE8........'],
+      [8,  '...89EEE8.......'],
+      [9,  '...89EEEE8......'],
+      [10, '...89EEEEE8.....'],
+      [11, '..899EEEEEE8....'],
+      [12, '..899EEEEEEE8...'],
+      [13, '..89999999998...'],
+      [14, '..8AAAAAAAAAA8..'],
+      [15, '..8BBBBBBBBBB8..'],
+      [16, '.F899EEEEEE998F.'],
       [17, 'FF999999999999FF'],
     ],
     left: [
-      [6,  '..........55....'],
-      [7,  '........55EE5...'],
-      [8,  '.......5EEEE5...'],
-      [9,  '......5EEEEE95..'],
-      [10, '.....5EEEEEE95..'],
-      [11, '....5EEEEEEE995.'],
-      [12, '...5EEEEEEEE995.'],
-      [13, '...599999999995.'],
-      [14, '..5AAAAAAAAAAA5.'],
-      [15, '..5BBBBBBBBBBB5.'],
-      [16, '.F5EEEEEEEEEEE5F'],
+      [6,  '..........88....'],
+      [7,  '........88EE8...'],
+      [8,  '.......8EEEE8...'],
+      [9,  '......8EEEEE98..'],
+      [10, '.....8EEEEEE98..'],
+      [11, '....8EEEEEEE998.'],
+      [12, '...8EEEEEEEE998.'],
+      [13, '...899999999998.'],
+      [14, '..8AAAAAAAAAAA8.'],
+      [15, '..8BBBBBBBBBBB8.'],
+      [16, '.F8EEEEEEEEEEE8F'],
       [17, 'FF999999999999FF'],
     ],
   }, { clearDots: true });
 }
 
-// Champion Crown transform: removes the vanilla white cap and green headband,
-// placing a three-spiked royal coronet with a ruby center jewel directly atop
-// natural dark hair (indices 5/8) and parted forehead bangs.
+// Champion Crown transform: three-spiked royal coronet colored by Hat / Hair (E/9)
+// with an Accent center jewel and base rim (A/B) atop natural dark hair (8/F).
 function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
       [9,  '................'],
       [10, '................'],
-      [11, '..5....55....5..'],
-      [12, '.5E5..5EE5..5E5.'],
-      [13, '.5AA55AAAA55AA5.'],
-      [14, '..5AAACCCCAAA5..'],
+      [11, '..8....88....8..'],
+      [12, '.8E8..8EE8..8E8.'],
+      [13, '.8EE88EEEE88EE8.'],
+      [14, '..899EAAAAE998..'],
       [15, '..FBBBBBBBBBBF..'],
-      [16, '..F8858888588F..'],
+      [16, '..F8888888888F..'],
       [17, '.43888111188834.'],
     ],
     up: [
       [9,  '................'],
       [10, '................'],
-      [11, '..5....55....5..'],
-      [12, '.5E5..5EE5..5E5.'],
-      [13, '.5AA55AAAA55AA5.'],
-      [14, '..5AAAAAAAAAA5..'],
+      [11, '..8....88....8..'],
+      [12, '.8E8..8EE8..8E8.'],
+      [13, '.8EE88EEEE88EE8.'],
+      [14, '..899EEEEEE998..'],
       [15, '..FBBBBBBBBBBF..'],
-      [16, '..F8858888588F..'],
+      [16, '..F8888888888F..'],
       [17, '..F8888888888F..'],
-      [18, '.43F88588588F34.'],
+      [18, '.43F88888888F34.'],
       [19, '.43488888888434.'],
     ],
     left: [
       [9,  '................'],
       [10, '................'],
-      [11, '..5...5....5....'],
-      [12, '.5E5.5E5..5E5...'],
-      [13, '.5AA5AAA55AA5...'],
-      [14, '..5ACAAAAAAA5...'],
+      [11, '..8...8....8....'],
+      [12, '.8E8.8E8..8E8...'],
+      [13, '.8EE8EEE88EE8...'],
+      [14, '..8EAEEEEEE98...'],
       [15, '..FBBBBBBBBBF...'],
-      [16, '..F8858888888F..'],
+      [16, '..F8888888888F..'],
       [17, '..48888888888F..'],
     ],
   }, { clearDots: true });
 }
 
-// Dojo Headband transform: replaces the white cap with spiky natural dark hair
-// (indices 5/8) and wraps a clean 2-row martial-arts headband (A/B) with a
-// back knot and trailing tails.
+// Dojo Headband transform: spiky hair colored by Hat / Hair (E/9) with dark
+// outlines (8/F) and a 2-row tied martial-arts headband colored by Bandana & Bag (A/B).
 function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
       [9,  '................'],
       [10, '................'],
-      [11, '.....55..55.....'],
-      [12, '...5588558855...'],
-      [13, '..588588885885..'],
-      [14, '..588888888885..'],
+      [11, '.....88..88.....'],
+      [12, '...88EE88EE88...'],
+      [13, '..8EE9EEEE9EE8..'],
+      [14, '..899999999998..'],
       [15, '..FAAAAAAAAAAF..'],
       [16, '..FBBBBBBBBBBF..'],
       [17, '.43888111188834.'],
@@ -342,10 +342,10 @@ function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'w
     up: [
       [9,  '................'],
       [10, '................'],
-      [11, '.....55..55.....'],
-      [12, '...5588558855...'],
-      [13, '..588588885885..'],
-      [14, '..588888888885..'],
+      [11, '.....88..88.....'],
+      [12, '...88EE88EE88...'],
+      [13, '..8EE9EEEE9EE8..'],
+      [14, '..899999999998..'],
       [15, '..FAAAAFFAAAAF..'],
       [16, '..FBBBBAABBBBF..'],
       [17, '..F888BAAB888F..'],
@@ -355,30 +355,30 @@ function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'w
     left: [
       [9,  '................'],
       [10, '................'],
-      [11, '....55..55......'],
-      [12, '..5588558855....'],
-      [13, '..58858888885...'],
-      [14, '..58888888885...'],
-      [15, '..FAAAAAAAAAA5A5'],
-      [16, '..FBBBBBBBBBB5B5'],
+      [11, '....88..88......'],
+      [12, '..88EE88EE88....'],
+      [13, '..8EE9EEEEEE8...'],
+      [14, '..89999999998...'],
+      [15, '..FAAAAAAAAAA8A8'],
+      [16, '..FBBBBBBBBBB8B8'],
       [17, '..48888888888F..'],
     ],
   }, { clearDots: true });
 }
 
-// Kitty Nose & Whiskers accessory overlay: places a 2px pink button nose right
-// between the eyes (x=7..8) and dark whisker ticks on the outer cheeks.
+// Kitty Nose & Whiskers accessory overlay: places a 2px rosy button nose (index 3)
+// right between the eyes (x=7..8) and dark whisker ticks (F) on the outer cheeks.
 function applyCatWhiskersAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
     const { dir, isRun, topDy, dx } = getFrameHeadMetrics(f, kind);
     if (dir === 'down') {
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '  F    CC    F  ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  F    33    F  ', { dx, clearDots: false });
       if (isRun) {
         stampFrameRow(indexed, width, height, f, 21 + topDy, '      2  2      ', { dx, clearDots: false });
       }
     } else if (dir === 'left') {
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '  C   F         ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  3   F         ', { dx, clearDots: false });
     }
   }
 }
@@ -403,7 +403,7 @@ function applyCoolShadesAccessory(indexed, width = 144, height = 32, kind = 'wal
 }
 
 // Floating Halo accessory overlay: delicate 2-row luminous ring hovering just
-// above the head (automatically lifts higher if a tall spire like wizard-hat is worn).
+// above the head (uses 8/E/9 so Pants index 5 never bleeds into the halo).
 function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
@@ -421,29 +421,29 @@ function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walk
     }
     const baseY = (hasTallSpire ? 3 : 7) + eyeDy;
     const shiftX = dx + (dir === 'left' ? -1 : 0);
-    stampFrameRow(indexed, width, height, f, baseY, '    5EEEEEE5    ', { dx: shiftX, clearDots: true });
-    stampFrameRow(indexed, width, height, f, baseY + 1, '   5E99..99E5   ', { dx: shiftX, clearDots: true });
+    stampFrameRow(indexed, width, height, f, baseY, '    8EEEEEE8    ', { dx: shiftX, clearDots: true });
+    stampFrameRow(indexed, width, height, f, baseY + 1, '   8E99..99E8   ', { dx: shiftX, clearDots: true });
   }
 }
 
-// Champion Scarf accessory overlay: wraps an accent scarf around the neck and
-// collar (rows 22..23 + topDy, below the chin at row 21 + topDy) with a trailing tail.
+// Champion Scarf accessory overlay: wraps an accent scarf (A/B) with fixed dark
+// outline (8) around the neck and collar so Pants index 5 never bleeds in.
 function applyHeroScarfAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
-      [22, '   5AAAAAAAA5   '],
-      [23, '   5BBBBAAAB5   '],
-      [24, '        5AB5    '],
+      [22, '   8AAAAAAAA8   '],
+      [23, '   8BBBBAAAB8   '],
+      [24, '        8AB8    '],
     ],
     up: [
-      [22, '   5AAAAAAAA5   '],
-      [23, '   5BBBBAAAB5   '],
-      [24, '       5AAB5    '],
+      [22, '   8AAAAAAAA8   '],
+      [23, '   8BBBBAAAB8   '],
+      [24, '       8AAB8    '],
     ],
     left: [
-      [22, '   5AAAAAAA5    '],
-      [23, '    5BBBBAAAB5  '],
-      [24, '         5AABB5 '],
+      [22, '   8AAAAAAA8    '],
+      [23, '    8BBBBAAAB8  '],
+      [24, '         8AABB8 '],
     ],
   }, { clearDots: false });
 }
