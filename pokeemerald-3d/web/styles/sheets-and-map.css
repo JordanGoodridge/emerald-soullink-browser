@@ -18,7 +18,7 @@
   display: grid;
   gap: 10px;
   padding-top: 10px;
-  border-top: 1px solid #ffffff14;
+  border-top: 1px solid #d9dac5;
 }
 
 .settings-group h3 {
@@ -69,7 +69,7 @@
 .settings-bindings th,
 .settings-bindings td {
   padding: 4px 6px;
-  border-bottom: 1px solid #ffffff10;
+  border-bottom: 1px solid #dfe0cd;
   text-align: left;
 }
 
@@ -483,11 +483,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.party-run-tracker { display: grid; gap: 9px; padding-top: 10px; border-top: 1px solid #ffffff10; }
+.party-run-tracker { display: grid; gap: 9px; padding-top: 10px; border-top: 1px solid #cfd4c2; }
 .party-run-tracker h3, .party-graveyard h4 { margin: 0; color: var(--mint); }
 .run-area-list, .party-graveyard ul, .party-run-history ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .run-area { display: grid; gap: 3px; padding: 6px 8px; }
 .run-area span, .party-run-history li, .party-graveyard li { color: var(--muted); font-size: .84rem; overflow-wrap: anywhere; }
 .run-area[data-status="dead"], .run-area[data-status="void"] { border-left: 3px solid var(--error); }
-.party-graveyard { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid #ffffff1a; }
-.party-run-history summary { color: var(--gold); cursor: pointer; }
+.party-graveyard { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid #cfd4c2; }
+.party-run-history summary { color: var(--mint); cursor: pointer; }

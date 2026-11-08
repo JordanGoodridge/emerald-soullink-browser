@@ -136,6 +136,7 @@ All production WASM files fit in a single `read_file` call (`<800` lines):
 > Edit the focused module directly (`style.css` and `library.css` are `@import` entrypoints):
 - **Base Shell (`style.css`):** `base-shell.css` (643L), `presence-and-dialogs-base.css` (319L), `overworld-overlays.css` (108L), `sheets-and-map.css` (382L)
 - **Library & Framed Pixel Theme (`library.css`):** `library-core.css` (965L), `library-framed-theme.css` (1,080L), `library-sheets.css` (493L), `library-friends-and-lobbies.css` (1,051L)
+- **UI Theme Guardrail (Light Ivory & Sage-Green Only):** All dialogs, sheets, cards, and active states use the warm ivory & sage-green pixel-framed theme (`#f8f5e8` dialog surfaces, `#f5f4e4` section cards, `#ecebd9` inset trays, `#fffdf1` buttons/inputs, `#e4f3df` + `var(--lib-green)` for `.is-active` / `.is-selected`). **NEVER** use `--frame-navy` (`#152540`) or dark navy/black fills (`#1a2840`, `#121d30`, `#07110f`, `#ffffff0a`) as card, section, input, or active-button backgrounds; `--frame-navy` is strictly for text ink, structural borders, and the outer `.pixel-frame` border.
 
 ### Presence, Packs & Server (`pokeemerald-3d/web/presence/`, `packs/`, `server/src/`)
 - **Presence (`pokeemerald-3d/web/presence/`):** `runtime.mjs` (496L), `presence-client.mjs` (543L), `remote-actors.mjs` (426L), `protocol.mjs` (393L), `lobby.mjs` (335L), `peer-overlay-model.mjs` (235L), `party-panel-model.mjs` (215L)
