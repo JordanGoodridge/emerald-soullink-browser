@@ -93,6 +93,7 @@ export function createCharacterCustomizerView({
   const motionRunButton = doc?.querySelector?.('#customizer-motion-run');
   const slotTabsContainer = doc?.querySelector?.('#customizer-slot-tabs');
   const slotsContainer = doc?.querySelector?.('#customizer-clothing-slots');
+  const colorsHeadingEl = doc?.querySelector?.('#customizer-colors-heading');
   const aspectTabsContainer = doc?.querySelector?.('#customizer-color-tabs');
   const swatchesContainer = doc?.querySelector?.('#customizer-color-swatches');
   const colorPickerInput = doc?.querySelector?.('#customizer-color-picker');
@@ -190,7 +191,7 @@ export function createCharacterCustomizerView({
         tab.append(slotTitle, equippedBadge);
         tab.addEventListener('click', () => {
           activeSlotId = slot.id;
-          renderSlots();
+          renderAll();
         });
         slotTabsContainer.append(tab);
       }
@@ -304,22 +305,56 @@ export function createCharacterCustomizerView({
     }
   }
 
-  function renderColorControls() {
+  function getActiveSlotColorContext() {
+    const slots = schema.clothingSlots ?? [];
+    const activeSlot = slots.find((entry) => entry.id === activeSlotId) ?? slots[0];
+    const items = activeSlot?.items ?? [];
+    const equippedId = customization.equipped?.[activeSlot?.id] ?? activeSlot?.defaultItemId;
+    const equippedItem = items.find((entry) => entry.id === equippedId) ?? items[0];
+    const channels = Array.isArray(equippedItem?.colorChannels) && equippedItem.colorChannels.length > 0
+      ? equippedItem.colorChannels
+      : (schema.colorAspects ?? []).map((aspect) => ({ aspectId: aspect.id, label: aspect.label }));
+    return { activeSlot, equippedItem, channels };
+  }
+
+  function renderColorControls({ preserveAspect = false } = {}) {
     const aspects = schema.colorAspects ?? [];
+    const { equippedItem, channels } = getActiveSlotColorContext();
+    const channelMap = new Map(channels.map((ch) => [ch.aspectId, ch.label]));
+
+    if (!preserveAspect && channels.length > 0 && !channelMap.has(activeAspectId)) {
+      activeAspectId = channels[0].aspectId;
+    }
     if (!aspects.some((entry) => entry.id === activeAspectId)) {
-      activeAspectId = aspects[0]?.id ?? '';
+      activeAspectId = channels[0]?.aspectId ?? aspects[0]?.id ?? '';
     }
     const activeAspect = aspects.find((entry) => entry.id === activeAspectId) ?? aspects[0];
+    const activeChannelLabel = channelMap.get(activeAspect?.id) ?? activeAspect?.label ?? 'Colors';
+
+    if (colorsHeadingEl) {
+      colorsHeadingEl.textContent = equippedItem?.label && equippedItem.id !== 'none'
+        ? `${equippedItem.label} — ${activeChannelLabel}`
+        : activeChannelLabel;
+    }
 
     if (aspectTabsContainer) {
       aspectTabsContainer.replaceChildren();
-      for (const aspect of aspects) {
+      // Order contextual channels for the selected item first, followed by hidden fallback tabs:
+      const orderedAspects = [
+        ...channels.map((ch) => aspects.find((a) => a.id === ch.aspectId)).filter(Boolean),
+        ...aspects.filter((a) => !channelMap.has(a.id)),
+      ];
+      for (const aspect of orderedAspects) {
+        const isContextual = channelMap.has(aspect.id);
         const tab = doc.createElement('button');
         tab.type = 'button';
         const isSelected = aspect.id === activeAspect?.id;
-        tab.className = `customizer-aspect-tab${isSelected ? ' is-active' : ''}`;
+        tab.className = `customizer-aspect-tab${isSelected ? ' is-active' : ''}${isContextual ? '' : ' is-contextual-hidden'}`;
         tab.dataset.colorAspect = aspect.id;
         tab.setAttribute('aria-pressed', String(isSelected));
+        if (!isContextual) {
+          tab.setAttribute('hidden', 'hidden');
+        }
 
         const dot = doc.createElement('span');
         dot.className = 'customizer-aspect-dot';
@@ -328,12 +363,12 @@ export function createCharacterCustomizerView({
         if (dot.style) dot.style.backgroundColor = currentHex;
 
         const label = doc.createElement('span');
-        label.textContent = aspect.label;
+        label.textContent = channelMap.get(aspect.id) ?? aspect.label;
 
         tab.append(dot, label);
         tab.addEventListener('click', () => {
           activeAspectId = aspect.id;
-          renderColorControls();
+          renderColorControls({ preserveAspect: true });
         });
         aspectTabsContainer.append(tab);
       }
@@ -352,7 +387,7 @@ export function createCharacterCustomizerView({
         btn.className = `customizer-swatch-btn${isSelected ? ' is-selected' : ''}`;
         btn.dataset.colorSwatch = swatchHex;
         btn.dataset.swatchId = swatch.id;
-        btn.setAttribute('aria-label', `${activeAspect.label}: ${swatch.label}`);
+        btn.setAttribute('aria-label', `${activeChannelLabel}: ${swatch.label}`);
         btn.setAttribute('aria-pressed', String(isSelected));
         btn.title = swatch.label;
 
@@ -380,13 +415,13 @@ export function createCharacterCustomizerView({
     }
   }
 
-  function renderAll() {
+  function renderAll({ preserveAspect = false } = {}) {
     renderSlots();
-    renderColorControls();
+    renderColorControls({ preserveAspect });
     renderPreview();
   }
 
-  function commitCustomization(nextCustomization) {
+  function commitCustomization(nextCustomization, { preserveAspect = false } = {}) {
     customization = store.save(nextCustomization, {
       gameId: activeGameId,
       rigId: schema.id,
@@ -398,7 +433,7 @@ export function createCharacterCustomizerView({
       manifest: activeManifest,
       schema,
     });
-    renderAll();
+    renderAll({ preserveAspect });
     onChange?.(compiled);
     return compiled;
   }
@@ -411,17 +446,18 @@ export function createCharacterCustomizerView({
         ...(customization.equipped ?? {}),
         [slotId]: itemId,
       },
-    });
+    }, { preserveAspect: false });
   }
 
   function selectColor(aspectId, hexColor) {
+    activeAspectId = aspectId;
     return commitCustomization({
       ...customization,
       colors: {
         ...(customization.colors ?? {}),
         [aspectId]: normalizeHexColor(hexColor),
       },
-    });
+    }, { preserveAspect: true });
   }
 
   function resetToDefault() {

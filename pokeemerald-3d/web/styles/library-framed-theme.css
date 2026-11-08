@@ -1091,6 +1091,20 @@
   color: var(--lib-green);
 }
 
+#character-customizer-dialog .customizer-section[aria-labelledby="customizer-colors-heading"] {
+  border: 2px solid var(--frame-navy);
+  background: #1a2840;
+  color: var(--frame-ivory);
+  box-shadow: 0 3px 0 #0c1526;
+}
+
+#character-customizer-dialog .customizer-section[aria-labelledby="customizer-colors-heading"] h3 {
+  border-bottom-color: rgb(255 253 241 / 18%);
+  color: #f6e7b2;
+  font-size: 14.5px;
+  letter-spacing: 0.02em;
+}
+
 .customizer-color-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1100,70 +1114,84 @@
 #character-customizer-dialog .customizer-aspect-tab {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-height: 30px;
-  padding: 3px 8px;
-  border: 1px solid #cfd4c2;
-  background: #fffdf1;
-  box-shadow: 0 2px 0 #d7dac8;
-  font-size: 13px;
+  padding: 4px 10px;
+  border: 1px solid #3a4f73;
+  background: #243554;
+  color: #d6e1f2;
+  box-shadow: 0 2px 0 #101b2e;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+#character-customizer-dialog .customizer-aspect-tab.is-contextual-hidden,
+#character-customizer-dialog .customizer-aspect-tab[hidden] {
+  display: none !important;
 }
 
 #character-customizer-dialog .customizer-aspect-tab.is-active {
-  border: 2px solid var(--frame-navy);
-  background: var(--frame-navy);
-  color: var(--frame-ivory);
+  border: 2px solid #f6e7b2;
+  background: #fffdf1;
+  color: var(--frame-navy);
   box-shadow: 0 2px 0 #0c1628;
 }
 
 .customizer-aspect-dot {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
   flex-shrink: 0;
-  border: 1px solid rgb(21 37 64 / 45%);
+  border: 1.5px solid rgb(255 255 255 / 75%);
   background: var(--swatch-color, #ff625a);
 }
 
 .customizer-aspect-tab.is-active .customizer-aspect-dot {
-  border-color: var(--frame-ivory);
+  border-color: var(--frame-navy);
 }
 
 .customizer-color-swatches {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid #2e4266;
+  background: #121d30;
 }
 
 #character-customizer-dialog .customizer-swatch-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 7px;
-  min-height: 34px;
-  padding: 5px 8px;
-  border: 1px solid #cfd4c2;
-  background: #fffdf1;
-  box-shadow: 0 2px 0 #d7dac8;
-  font-size: 13px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 3px 9px 3px 5px;
+  border: 1.5px solid #344a70;
+  border-radius: 999px;
+  background: #1f2f4a;
+  color: #dce6f5;
+  box-shadow: 0 2px 0 #0a1220;
+  font-size: 12px;
 }
 
 #character-customizer-dialog .customizer-swatch-btn.is-selected {
-  border: 2px solid var(--lib-green);
-  background: #e4f3df;
-  box-shadow: 0 2px 0 #82b592;
-  color: var(--lib-green);
+  border: 2px solid #73e69c;
+  background: #214536;
+  box-shadow: 0 0 0 2px rgb(115 230 156 / 28%);
+  color: #ffffff;
   font-weight: 700;
 }
 
 .customizer-swatch-chip {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
   flex-shrink: 0;
-  border: 1px solid var(--frame-navy);
+  border: 1.5px solid rgb(255 255 255 / 85%);
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 22%);
 }
 
 .customizer-swatch-label {
-  font-size: 13px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1174,11 +1202,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 10px;
-  border: 1px solid #cfd4c2;
-  background: #fffdf1;
-  color: var(--frame-navy);
-  font-size: 14px;
+  padding: 5px 9px;
+  border: 1px solid #2e4266;
+  background: #121d30;
+  color: #dce6f5;
+  font-size: 12.5px;
 }
 
 .customizer-color-picker-wrap {
@@ -1188,21 +1216,21 @@
 }
 
 .customizer-color-picker-wrap input[type="color"] {
-  width: 32px;
-  height: 26px;
+  width: 28px;
+  height: 24px;
   padding: 0;
-  border: 1px solid var(--frame-navy);
-  border-radius: 0;
+  border: 1px solid #f6e7b2;
+  border-radius: 4px;
   background: transparent;
   cursor: pointer;
 }
 
 .customizer-color-picker-wrap code {
   padding: 2px 6px;
-  border: 1px solid #d7dac8;
-  background: #f1f1df;
-  color: var(--frame-navy);
-  font-size: 13px;
+  border: 1px solid #344a70;
+  background: #1f2f4a;
+  color: #f6e7b2;
+  font-size: 12px;
 }
 
 .customizer-footer {

@@ -13,7 +13,10 @@ import {
   resolveCharacterSchema,
   snapGbaChannel,
 } from './character-catalog.mjs';
-import { normalizeCustomization } from './character-store.mjs';
+import {
+  isDefaultCustomization,
+  normalizeCustomization,
+} from './character-store.mjs';
 
 export function rgbToGba15([r, g, b]) {
   const r5 = Math.max(0, Math.min(31, Math.round(clampChannel(r) * 31 / 255)));
@@ -172,7 +175,7 @@ function isCustomTrimActive(schema, normalized) {
   if (!trimAspect) return false;
   const currentHex = normalizeHexColor(normalized.colors?.trim, trimAspect.defaultHex);
   const isCustomHex = currentHex !== normalizeHexColor(trimAspect.defaultHex);
-  const headSlot = (schema.clothingSlots ?? []).find((entry) => entry.id === 'head');
+  const headSlot = (schema.colorAspects ? schema.clothingSlots : [])?.find((entry) => entry.id === 'head');
   const defaultHeadId = headSlot?.defaultItemId ?? 'emerald-hat';
   const equippedHead = normalized.equipped?.head ?? defaultHeadId;
   const equippedAccessory = normalized.equipped?.accessory ?? 'none';
@@ -188,6 +191,7 @@ function compositeIndexedMotionSheet(kind, schema, normalized, sheetCache, custo
   const firstSheet = sheetCache.values().next().value;
   const baseIndexed = firstSheet?.[kind] ?? new Uint8Array(sheetWidth * frameHeight);
   const composited = new Uint8Array(baseIndexed);
+  const customSpriteActive = !isDefaultCustomization(normalized, schema);
 
   for (const slot of schema.clothingSlots ?? []) {
     const equippedId = normalized.equipped?.[slot.id] ?? slot.defaultItemId;
@@ -200,15 +204,15 @@ function compositeIndexedMotionSheet(kind, schema, normalized, sheetCache, custo
       const startOffset = Math.max(0, yStart) * sheetWidth;
       const endOffset = Math.min(frameHeight - 1, yEnd + 1) * sheetWidth;
       for (let i = startOffset; i < endOffset; i++) {
-        const px = source[i];
-        // When custom 2nd Color / Trim (indices 6, 7) is active, remap any stray
-        // vanilla index-6 shadow pixels in the base sheet to 8 (dark outline)
-        // before running slot transforms so indices 6 and 7 are 100% isolated.
-        composited[i] = (customTrimActive && px === 6) ? 8 : px;
+        let px = source[i];
+        if (customTrimActive && px === 6 && item.id !== 'rs-cap') {
+          px = 8;
+        }
+        composited[i] = px;
       }
     }
     if (typeof item.transform === 'function') {
-      item.transform(composited, sheetWidth, frameHeight, kind, normalized, customTrimActive);
+      item.transform(composited, sheetWidth, frameHeight, kind, normalized, customSpriteActive);
     }
   }
 

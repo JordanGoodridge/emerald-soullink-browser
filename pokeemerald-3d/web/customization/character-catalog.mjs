@@ -110,10 +110,77 @@ export function buildColorRamp(hex, stops = 2, {
   ]);
 }
 
+function isolateTorsoShirtPixels(indexed, width = 144, height = 32, kind = 'walkingIndexed', normalized = null) {
+  const topHex = normalizeHexColor(normalized?.colors?.top, '#ff625a');
+  const headHex = normalizeHexColor(normalized?.colors?.head, '#ffffff');
+  const skinHex = normalizeHexColor(normalized?.colors?.skin, '#ffc594');
+  const isCustomTop = topHex !== '#ff625a';
+  const isCustomHead = headHex !== '#ffffff';
+  const isCustomSkin = skinHex !== '#ffc594';
+  if (!isCustomTop && !isCustomHead && !isCustomSkin) return;
+
+  const frames = Math.floor(width / 16);
+  for (let f = 0; f < frames; f++) {
+    const { dir } = getFrameHeadMetrics(f, kind);
+    const fx = f * 16;
+    for (let y = 22; y <= 27 && y < height; y++) {
+      for (let x = 0; x < 16; x++) {
+        const idx = y * width + fx + x;
+        const val = indexed[idx];
+        // Prevent Hat/Hair (14) from bleeding onto the 6 backpack strap buckle pixels on row 24..25:
+        if (isCustomHead && val === 14) {
+          indexed[idx] = 10;
+          continue;
+        }
+        // Prevent Skin Tone (4) from changing hip/belt shading on row 26..27:
+        if (isCustomSkin && y >= 26 && val === 4) {
+          indexed[idx] = 8;
+          continue;
+        }
+        // When a custom Shirt color is selected, map the inner tunic chest (indices 8 and 13
+        // inside x=5..10 on rows 24..26) to Shirt highlight/shadow (12/13) so the whole shirt recolors:
+        if (isCustomTop && dir !== 'up' && y >= 24 && y <= 26 && x >= 5 && x <= 10) {
+          if (val === 13) indexed[idx] = 12;
+          else if (val === 8) indexed[idx] = 13;
+        }
+      }
+    }
+  }
+}
+
+function applyEmeraldTunicTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed', normalized = null) {
+  isolateTorsoShirtPixels(indexed, width, height, kind, normalized);
+}
+
+// Ruby / Sapphire Jacket transform: remaps the long jacket sleeves from Bandana/Bag
+// indices (10, 11) to Shirt indices (12, 13) while keeping the backpack on the back (10, 11).
+function applyRsJacketTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed', normalized = null) {
+  const topHex = normalizeHexColor(normalized?.colors?.top, '#ff625a');
+  const accentHex = normalizeHexColor(normalized?.colors?.accent, '#73cd73');
+  const isCustomTopOrAccent = topHex !== '#ff625a' || accentHex !== '#73cd73';
+  if (isCustomTopOrAccent) {
+    const frames = Math.floor(width / 16);
+    for (let f = 0; f < frames; f++) {
+      const { dir } = getFrameHeadMetrics(f, kind);
+      const fx = f * 16;
+      for (let y = 23; y <= 27 && y < height; y++) {
+        for (let x = 0; x < 16; x++) {
+          const isBackpack = (dir === 'up' && x >= 5 && x <= 10) || (dir === 'left' && x >= 10);
+          if (isBackpack) continue;
+          const idx = y * width + fx + x;
+          if (indexed[idx] === 10) indexed[idx] = 12;
+          else if (indexed[idx] === 11) indexed[idx] = 13;
+        }
+      }
+    }
+  }
+  isolateTorsoShirtPixels(indexed, width, height, kind, normalized);
+}
+
 // Sleeveless vest pixel transform: converts the outer short-sleeve shirt pixels
 // (indices 12, 13) on the torso rows into bare arms (skin indices 1, 2) while
 // adding an accent trim (index 10) at the vest shoulder edge.
-function applySleevelessVestTransform(indexed, width = 144, height = 32) {
+function applySleevelessVestTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed', normalized = null) {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
     const fx = f * 16;
@@ -126,6 +193,45 @@ function applySleevelessVestTransform(indexed, width = 144, height = 32) {
           indexed[idx] = val === 12 ? 1 : 2;
         } else if ((x === 5 || x === 10) && y === 23 && (val === 12 || val === 13)) {
           indexed[idx] = 10;
+        }
+      }
+    }
+  }
+  isolateTorsoShirtPixels(indexed, width, height, kind, normalized);
+}
+
+// Pants & Shoes transform: maps the interior pant-leg pixels on row 28 to index 5
+// ('bottom' / Pants color) whenever a custom Pants color is chosen, while keeping
+// the outer black silhouette outline (15) and isolating shoe pixels from Skin Tone (4).
+function applyPantsAndShoesTransform(indexed, width = 144, height = 32, _kind = 'walkingIndexed', normalized = null) {
+  const bottomHex = normalizeHexColor(normalized?.colors?.bottom, '#394a7b');
+  const skinHex = normalizeHexColor(normalized?.colors?.skin, '#ffc594');
+  const isCustomBottom = bottomHex !== '#394a7b';
+  const isCustomSkin = skinHex !== '#ffc594';
+  if (!isCustomBottom && !isCustomSkin) return;
+
+  const frames = Math.floor(width / 16);
+  for (let f = 0; f < frames; f++) {
+    const fx = f * 16;
+    if (isCustomBottom && 28 < height) {
+      const y = 28;
+      const rowCopy = indexed.slice(y * width + fx, y * width + fx + 16);
+      for (let x = 1; x < 15; x++) {
+        const val = rowCopy[x];
+        const hasLeft = rowCopy[x - 1] !== 0;
+        const hasRight = rowCopy[x + 1] !== 0;
+        if (val === 4 || (val === 15 && hasLeft && hasRight)) {
+          indexed[y * width + fx + x] = 5;
+        }
+      }
+    }
+    if ((isCustomBottom || isCustomSkin) && 29 < height) {
+      for (let y = 29; y <= 30 && y < height; y++) {
+        for (let x = 0; x < 16; x++) {
+          const idx = y * width + fx + x;
+          if (indexed[idx] === 4) {
+            indexed[idx] = 13;
+          }
         }
       }
     }
@@ -187,26 +293,27 @@ function stampDirectionalRows(indexed, width, height, kind, rowsByDir, {
   }
 }
 
-// Emerald Bandana Hat transform: when the player picks a custom 2nd Color / Trim,
-// remaps the head bandana pixels (10/11) to trim indices (6/7) on head rows so
-// the bandana can be recolored independently of the backpack.
+// Isolates the vanilla hat top outline (index 5) on head rows (0..21) to dark
+// outline (index 8) when the player picks a custom Pants color so Pants never
+// recolors the hat outline.
 function applyEmeraldHatTransform(indexed, width = 144, height = 32, _kind = 'walkingIndexed', normalized = null) {
-  const trimHex = normalizeHexColor(normalized?.colors?.trim, '#ff94c2');
-  if (trimHex === '#ff94c2') return;
+  const bottomHex = normalizeHexColor(normalized?.colors?.bottom, '#394a7b');
+  if (bottomHex === '#394a7b') return;
   const maxOffset = Math.min(height, 22) * width;
   for (let i = 0; i < maxOffset; i++) {
-    if (indexed[i] === 10) indexed[i] = 6;
-    else if (indexed[i] === 11) indexed[i] = 7;
+    if (indexed[i] === 5) indexed[i] = 8;
   }
 }
 
-// Ruby / Sapphire Cap transform: remaps the front cap emblem pixels (12/13) on
-// the head rows to trim indices (6/7) so Shirt & Shoes never bleeds into the cap
-// and 2nd Color / Trim controls the emblem color.
+// Ruby / Sapphire Cap transform: remaps the front cap emblem pixels (12/13) and
+// cap band (6) on the head rows to trim indices (6/7), and isolates the hat outline (5 -> 8)
+// so neither Shirt & Shoes nor Pants ever bleed into the cap.
 function applyRsCapTransform(indexed, width = 144, height = 32) {
   const maxOffset = Math.min(height, 22) * width;
   for (let i = 0; i < maxOffset; i++) {
-    if (indexed[i] === 12) indexed[i] = 6;
+    if (indexed[i] === 5) indexed[i] = 8;
+    else if (indexed[i] === 6) indexed[i] = 7;
+    else if (indexed[i] === 12) indexed[i] = 6;
     else if (indexed[i] === 13) indexed[i] = 7;
   }
 }
@@ -407,21 +514,21 @@ function applyCatWhiskersAccessory(indexed, width = 144, height = 32, kind = 'wa
   }
 }
 
-// Squirtle Squad Shades accessory overlay: sleek 2-row sunglasses across the eye
-// rows with a visible nose bridge (11), white lens glint (E), and 2nd Color / Trim lens tint (7).
+// Squirtle Squad Shades accessory overlay: sleek 2-row dark sunglasses across
+// the eye rows with a visible nose bridge (11), white lens glint (E), and dark charcoal lens (8).
 function applyCoolShadesAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
     const { dir, isRun, topDy, dx } = getFrameHeadMetrics(f, kind);
     if (dir === 'down') {
       stampFrameRow(indexed, width, height, f, 19 + topDy, '  FFFFFFFFFFFF  ', { dx, clearDots: false });
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '   FE7F11FE7F   ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '   FE8F11FE8F   ', { dx, clearDots: false });
       if (isRun) {
         stampFrameRow(indexed, width, height, f, 21 + topDy, '      2  2      ', { dx, clearDots: false });
       }
     } else if (dir === 'left') {
       stampFrameRow(indexed, width, height, f, 19 + topDy, '  FFFFFFF       ', { dx, clearDots: false });
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '  FE7F          ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  FE8F          ', { dx, clearDots: false });
     }
   }
 }
@@ -450,24 +557,24 @@ function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walk
   }
 }
 
-// Champion Scarf accessory overlay: wraps a 2nd Color / Trim scarf (6/7) with
-// fixed dark outline (8) around the neck and collar.
+// Champion Scarf accessory overlay: wraps an accent scarf (A/B, indices 10/11)
+// with fixed dark outline (8) around the neck and collar so it stays independent of headwear trim.
 function applyHeroScarfAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
-      [22, '   8666666668   '],
-      [23, '   8777766678   '],
-      [24, '        8678    '],
+      [22, '   8AAAAAAAA8   '],
+      [23, '   8BBBBAAAB8   '],
+      [24, '        8AB8    '],
     ],
     up: [
-      [22, '   8666666668   '],
-      [23, '   8777766678   '],
-      [24, '       86678    '],
+      [22, '   8AAAAAAAA8   '],
+      [23, '   8BBBBAAAB8   '],
+      [24, '       8AAB8    '],
     ],
     left: [
-      [22, '   866666668    '],
-      [23, '    8777766678  '],
-      [24, '         866778 '],
+      [22, '   8AAAAAAA8    '],
+      [23, '    8BBBBAAAB8  '],
+      [24, '         8AABB8 '],
     ],
   }, { clearDots: false });
 }
@@ -510,6 +617,10 @@ function createGen3BrendanRig() {
             description: 'Default Emerald white cap with headband wrap',
             sourceSheet: 'emerald',
             transform: applyEmeraldHatTransform,
+            colorChannels: [
+              { aspectId: 'head', label: 'Cap Color' },
+              { aspectId: 'accent', label: 'Bandana & Bag' },
+            ],
           },
           {
             id: 'rs-cap',
@@ -517,6 +628,10 @@ function createGen3BrendanRig() {
             description: 'Classic Hoenn emblem cap without bandana wrap',
             sourceSheet: 'rs',
             transform: applyRsCapTransform,
+            colorChannels: [
+              { aspectId: 'head', label: 'Cap Color' },
+              { aspectId: 'trim', label: 'Cap Emblem & Band' },
+            ],
           },
           {
             id: 'kitten-ears',
@@ -524,6 +639,10 @@ function createGen3BrendanRig() {
             description: 'Perked-up neko ears headband with pink inner ear tufts',
             sourceSheet: 'emerald',
             transform: applyKittenEarsTransform,
+            colorChannels: [
+              { aspectId: 'head', label: 'Outer Ears' },
+              { aspectId: 'trim', label: 'Inner Ears' },
+            ],
           },
           {
             id: 'wizard-hat',
@@ -531,6 +650,10 @@ function createGen3BrendanRig() {
             description: 'Tall pointed spellcaster spire with wide brim and clasp',
             sourceSheet: 'emerald',
             transform: applyWizardHatTransform,
+            colorChannels: [
+              { aspectId: 'head', label: 'Wizard Hat' },
+              { aspectId: 'trim', label: 'Hatband & Clasp' },
+            ],
           },
           {
             id: 'royal-crown',
@@ -538,6 +661,10 @@ function createGen3BrendanRig() {
             description: 'Three-spiked royal coronet with a jeweled emblem crest',
             sourceSheet: 'emerald',
             transform: applyRoyalCrownTransform,
+            colorChannels: [
+              { aspectId: 'head', label: 'Crown Metal' },
+              { aspectId: 'trim', label: 'Crown Gem & Rim' },
+            ],
           },
           {
             id: 'dojo-headband',
@@ -545,6 +672,10 @@ function createGen3BrendanRig() {
             description: 'Sleek bare-crown hair with a tied martial-arts headband',
             sourceSheet: 'emerald',
             transform: applyDojoHeadbandTransform,
+            colorChannels: [
+              { aspectId: 'head', label: 'Spiky Hair' },
+              { aspectId: 'trim', label: 'Headband Wrap' },
+            ],
           },
         ],
       },
@@ -559,12 +690,24 @@ function createGen3BrendanRig() {
             label: 'Emerald Short-Sleeve',
             description: 'Default Emerald layered short-sleeve tunic',
             sourceSheet: 'emerald',
+            transform: applyEmeraldTunicTransform,
+            colorChannels: [
+              { aspectId: 'top', label: 'Shirt & Shoes' },
+              { aspectId: 'accent', label: 'Backpack & Bandana' },
+              { aspectId: 'skin', label: 'Skin Tone' },
+            ],
           },
           {
             id: 'rs-jacket',
             label: 'Ruby / Sapphire Jacket',
             description: 'Long-sleeve zip track jacket with accent cuffs',
             sourceSheet: 'rs',
+            transform: applyRsJacketTransform,
+            colorChannels: [
+              { aspectId: 'top', label: 'Jacket & Shoes' },
+              { aspectId: 'accent', label: 'Backpack & Bandana' },
+              { aspectId: 'skin', label: 'Skin Tone' },
+            ],
           },
           {
             id: 'sleeveless-vest',
@@ -572,6 +715,11 @@ function createGen3BrendanRig() {
             description: 'Sleeveless battle vest with accent shoulder trim',
             sourceSheet: 'emerald',
             transform: applySleevelessVestTransform,
+            colorChannels: [
+              { aspectId: 'top', label: 'Vest & Shoes' },
+              { aspectId: 'accent', label: 'Shoulder Trim & Bag' },
+              { aspectId: 'skin', label: 'Skin Tone' },
+            ],
           },
         ],
       },
@@ -586,12 +734,22 @@ function createGen3BrendanRig() {
             label: 'Emerald Cargo & Sneakers',
             description: 'Default Emerald pants and accent-trim running shoes',
             sourceSheet: 'emerald',
+            transform: applyPantsAndShoesTransform,
+            colorChannels: [
+              { aspectId: 'bottom', label: 'Pants Color' },
+              { aspectId: 'top', label: 'Shoes & Shirt' },
+            ],
           },
           {
             id: 'rs-boots',
             label: 'Ruby / Sapphire Boots',
             description: 'Classic Hoenn trousers with solid two-tone boots',
             sourceSheet: 'rs',
+            transform: applyPantsAndShoesTransform,
+            colorChannels: [
+              { aspectId: 'bottom', label: 'Pants Color' },
+              { aspectId: 'top', label: 'Boots & Shirt' },
+            ],
           },
         ],
       },
@@ -606,6 +764,9 @@ function createGen3BrendanRig() {
             label: 'None',
             description: 'Standard look with no extra accessory equipped',
             sourceSheet: null,
+            colorChannels: [
+              { aspectId: 'skin', label: 'Skin Tone' },
+            ],
           },
           {
             id: 'cat-whiskers',
@@ -613,6 +774,10 @@ function createGen3BrendanRig() {
             description: 'Cute pink button nose and cheek whiskers for a neko look',
             sourceSheet: null,
             transform: applyCatWhiskersAccessory,
+            colorChannels: [
+              { aspectId: 'trim', label: 'Kitty Nose' },
+              { aspectId: 'skin', label: 'Skin Tone' },
+            ],
           },
           {
             id: 'cool-shades',
@@ -620,6 +785,10 @@ function createGen3BrendanRig() {
             description: 'Sharp dark sunglasses with a bright lens glint',
             sourceSheet: null,
             transform: applyCoolShadesAccessory,
+            colorChannels: [
+              { aspectId: 'skin', label: 'Skin Tone' },
+              { aspectId: 'accent', label: 'Bag & Accent' },
+            ],
           },
           {
             id: 'angel-halo',
@@ -627,6 +796,10 @@ function createGen3BrendanRig() {
             description: 'Luminous ring hovering above your trainer head',
             sourceSheet: null,
             transform: applyAngelHaloAccessory,
+            colorChannels: [
+              { aspectId: 'head', label: 'Halo Ring' },
+              { aspectId: 'trim', label: 'Halo Inner Glow' },
+            ],
           },
           {
             id: 'hero-scarf',
@@ -634,6 +807,9 @@ function createGen3BrendanRig() {
             description: 'Flowing accent scarf wrapped around the collar',
             sourceSheet: null,
             transform: applyHeroScarfAccessory,
+            colorChannels: [
+              { aspectId: 'accent', label: 'Scarf & Bag Color' },
+            ],
           },
         ],
       },
