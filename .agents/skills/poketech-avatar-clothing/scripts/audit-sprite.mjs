@@ -8,7 +8,7 @@
  *   node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs --slot top --item rs-jacket --sheet running
  */
 import {
-  DEFAULT_CHARACTER_CUSTOMIZATION,
+  createDefaultCharacterSelection,
   getCharacterRig,
 } from '../../../../pokeemerald-3d/web/customization/character-catalog.mjs';
 import {
@@ -28,7 +28,7 @@ const sheetName = getArg('--sheet', 'walking');
 const maxFrames = Number(getArg('--frames', '3'));
 
 const rig = getCharacterRig('gen3-brendan');
-const custom = structuredClone(DEFAULT_CHARACTER_CUSTOMIZATION);
+const custom = createDefaultCharacterSelection('gen3-brendan');
 if (slot && item) {
   custom.slots[slot] = item;
 }
