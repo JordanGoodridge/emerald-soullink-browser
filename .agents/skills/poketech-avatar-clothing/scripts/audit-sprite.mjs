@@ -31,7 +31,7 @@ const maxFrames = Number(getArg('--frames', '3'));
 const schema = resolveCharacterSchema({ rigId: 'gen3-brendan' });
 const custom = normalizeCustomization({}, schema);
 if (slot && item) {
-  custom.slots[slot] = item;
+  custom.pieces[slot] = item;
 }
 
 const compiled = compileCharacterCustomization(custom, { schema });
