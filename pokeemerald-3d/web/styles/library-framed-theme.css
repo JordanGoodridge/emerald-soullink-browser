@@ -679,6 +679,9 @@
 }
 
 #library-customize {
+  display: inline-flex;
+  align-items: stretch;
+  height: 56px;
   min-height: 56px;
   padding: 7px;
   border: 0;
@@ -686,12 +689,14 @@
   background: var(--frame-navy);
   box-shadow: none;
   cursor: pointer;
+  line-height: 1;
 }
 
 #library-customize.pixel-frame > .library-customize-face {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  height: 42px;
   min-height: 42px;
   padding: 0 14px 0 10px;
   color: var(--frame-navy);
