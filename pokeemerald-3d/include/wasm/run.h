@@ -94,6 +94,11 @@ u32 WasmRunTestCreateTrainerParty(u16 trainerId);
 u32 WasmRunEnemyPartyCount(void);
 u32 WasmRunEnemyPartySpecies(u32 index);
 u32 WasmRunEnemyPartyLevel(u32 index);
+u16 *WasmPlayerPaletteBuffer(void);
+u16 *WasmPlayerReflectionPaletteBuffer(void);
+u8 *WasmPlayerNormalPicBuffer(void);
+u8 *WasmPlayerRunningPicBuffer(void);
+void WasmApplyPlayerCustomization(void);
 #endif
 
 #endif // GUARD_WASM_RUN_H

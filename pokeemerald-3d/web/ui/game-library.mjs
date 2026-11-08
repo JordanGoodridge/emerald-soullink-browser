@@ -70,6 +70,7 @@ export function createGameLibrary({
   baseUrl = globalThis.location?.href,
   onOpen = null,
   onSettings = null,
+  onCustomize = null,
 } = {}) {
   const root = doc?.querySelector?.('#library');
   const errorEl = doc?.querySelector?.('#library-error');
@@ -78,6 +79,7 @@ export function createGameLibrary({
   const emptyEl = doc?.querySelector?.('#library-empty');
   const savesEl = doc?.querySelector?.('#library-saves-list');
   const settingsButton = doc?.querySelector?.('#library-settings');
+  const customizeButton = doc?.querySelector?.('#library-customize');
   const runModeDialog = doc?.querySelector?.('#run-mode-dialog');
   const runModeTitle = doc?.querySelector?.('#run-mode-title');
   const runModeClose = doc?.querySelector?.('#run-mode-close');
@@ -301,6 +303,9 @@ export function createGameLibrary({
 
   settingsButton?.addEventListener('click', () => {
     if (typeof onSettings === 'function') onSettings();
+  });
+  customizeButton?.addEventListener('click', () => {
+    if (typeof onCustomize === 'function') onCustomize(model?.hero?.id ?? 'emerald');
   });
 
   return {

@@ -111,6 +111,40 @@ export function packAvatarSheet(atlas, appearance, rgba, transparent) {
   return offset;
 }
 
+export function replaceAvatarSheetInAtlas(atlas, appearance, rgba, transparent = [0, 0, 0]) {
+  if (!atlas || !appearance || !rgba) return false;
+  if (rgba.length !== AVATAR_SHEET_WIDTH * AVATAR_SHEET_HEIGHT * 4) return false;
+  const entry = atlas.layers?.get(appearance);
+  if (!entry) return false;
+
+  const layerBytes = AVATAR_LAYER_SIZE * AVATAR_LAYER_SIZE * 4;
+  for (let frame = 0; frame < AVATAR_LAYERS_PER_SHEET; frame++) {
+    const layerBase = (entry.offset + frame) * layerBytes;
+    atlas.pixels.fill(0, layerBase, layerBase + layerBytes);
+    for (let y = 0; y < AVATAR_CELL_HEIGHT; y++) {
+      for (let x = 0; x < AVATAR_CELL_WIDTH; x++) {
+        const src = (y * AVATAR_SHEET_WIDTH + frame * AVATAR_CELL_WIDTH + x) * 4;
+        const dst = layerBase + (y * AVATAR_LAYER_SIZE + x) * 4;
+        if (keyedOut(rgba, src, transparent)) continue;
+        atlas.pixels[dst] = rgba[src];
+        atlas.pixels[dst + 1] = rgba[src + 1];
+        atlas.pixels[dst + 2] = rgba[src + 2];
+        atlas.pixels[dst + 3] = 255;
+      }
+    }
+    if (atlas.ghostOffset > 0) {
+      const ghostBase = (atlas.ghostOffset + entry.offset + frame) * layerBytes;
+      atlas.pixels.set(atlas.pixels.subarray(layerBase, layerBase + layerBytes), ghostBase);
+      for (let offset = ghostBase; offset < ghostBase + layerBytes; offset += 4) {
+        const alpha = atlas.pixels[offset + 3];
+        atlas.pixels[offset + 3] = alpha === 0 ? 0 : Math.max(1, Math.round(alpha * AVATAR_GHOST_ALPHA));
+      }
+    }
+  }
+  atlas.revision++;
+  return true;
+}
+
 export function avatarLayerFor(atlas, appearance, frame) {
   if (!atlas || !appearance) return -1;
   const sheet = atlas.layers.get(appearance);

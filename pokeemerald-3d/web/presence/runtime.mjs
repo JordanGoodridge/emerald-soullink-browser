@@ -13,7 +13,7 @@ import {
 import { createPresenceClient } from './presence-client.mjs';
 import { createRemoteActorStore } from './remote-actors.mjs';
 import { createGameAdapter } from './game-adapter.mjs';
-import { createAvatarAtlas, loadAvatarAtlas } from './avatar-manifest.mjs';
+import { createAvatarAtlas, loadAvatarAtlas, replaceAvatarSheetInAtlas } from './avatar-manifest.mjs';
 import { remotePresenterOptions } from './remote-renderer.mjs';
 
 const NAME_STORAGE_KEY = 'pokeemerald.presence.name.v1';
@@ -70,6 +70,7 @@ export function createPresenceRuntime({
   let activeContentVersion = contentVersion;
   let activeAvatarSheets = avatarSheets;
   let activeMapNameFor = mapNameFor;
+  const customAvatarRgbaByAppearance = new Map();
   let active = Boolean(enabled);
   let isRoomCreator = false;
   let name = normalizeName(search.get('presenceName') || '') || readStoredName() || 'Player';
@@ -429,6 +430,9 @@ export function createPresenceRuntime({
       : loadAvatars();
     loading
       .then((atlas) => {
+        for (const [appearance, rgba] of customAvatarRgbaByAppearance.entries()) {
+          replaceAvatarSheetInAtlas(atlas, appearance, rgba);
+        }
         avatarAtlas = atlas;
         avatarStatus = 'ready';
         notify();
@@ -464,6 +468,18 @@ export function createPresenceRuntime({
     return true;
   }
 
+  function setCustomAvatarSheet(appearance, rgba) {
+    if (!appearance) return false;
+    if (!rgba) {
+      customAvatarRgbaByAppearance.delete(appearance);
+      return false;
+    }
+    customAvatarRgbaByAppearance.set(appearance, rgba);
+    const updated = replaceAvatarSheetInAtlas(avatarAtlas, appearance, rgba);
+    if (updated) notify();
+    return updated;
+  }
+
   reloadAvatars();
 
   return {
@@ -471,6 +487,7 @@ export function createPresenceRuntime({
     configure,
     setAdapter,
     setName,
+    setCustomAvatarSheet,
     createRoom,
     joinRoom,
     leave,

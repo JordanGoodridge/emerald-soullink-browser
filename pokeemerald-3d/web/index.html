@@ -61,12 +61,20 @@
         </span>
         <h1>Your games</h1>
       </div>
-      <button id="library-settings" class="icon-button" type="button" aria-label="Open settings">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-      </button>
+      <div class="library-head-actions">
+        <button id="library-customize" class="library-customize-btn pixel-frame" type="button" aria-label="Customize character">
+          <span class="pixel-frame-content library-customize-face">
+            <canvas id="library-customize-icon" class="library-customize-icon" width="16" height="32" aria-hidden="true"></canvas>
+            <span>Customize</span>
+          </span>
+        </button>
+        <button id="library-settings" class="icon-button" type="button" aria-label="Open settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <p id="library-error" class="library-error" role="alert" hidden></p>
@@ -98,6 +106,59 @@
         <button type="button" data-run-mode="soullink"><strong>Multiplayer Nuzlocke / SoulLink</strong><span>Play with friends: link encounters and share fates</span></button>
       </div>
       <button id="run-mode-cancel" class="dialog-secondary" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <dialog id="character-customizer-dialog" class="themed-dialog character-customizer-dialog" aria-labelledby="customizer-title">
+    <div class="dialog-frame">
+      <header class="dialog-header">
+        <h2 id="customizer-title">Customize Character</h2>
+        <button id="customizer-close" class="icon-button" type="button" aria-label="Close character customizer">×</button>
+      </header>
+      <div class="customizer-layout">
+        <aside class="customizer-preview-pane pixel-frame">
+          <div class="pixel-frame-content customizer-preview-stage">
+            <div class="customizer-pedestal">
+              <canvas id="customizer-preview-canvas" class="customizer-preview-canvas" width="16" height="32" aria-label="Animated character preview"></canvas>
+            </div>
+            <div class="customizer-preview-controls">
+              <div class="customizer-rotate-row">
+                <button id="customizer-rotate-left" class="dialog-secondary customizer-mini-btn" type="button" aria-label="Rotate character left">◀</button>
+                <span id="customizer-direction-label" class="customizer-direction-label">Front</span>
+                <button id="customizer-rotate-right" class="dialog-secondary customizer-mini-btn" type="button" aria-label="Rotate character right">▶</button>
+              </div>
+              <div class="customizer-motion-row" role="group" aria-label="Preview motion">
+                <button id="customizer-motion-walk" class="dialog-secondary customizer-mini-btn is-active" type="button" aria-pressed="true">Walk</button>
+                <button id="customizer-motion-run" class="dialog-secondary customizer-mini-btn" type="button" aria-pressed="false">Run</button>
+              </div>
+              <button id="customizer-reset" class="dialog-secondary customizer-reset-btn" type="button">Reset Default</button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="customizer-controls-pane">
+          <section class="customizer-section" aria-labelledby="customizer-clothing-heading">
+            <h3 id="customizer-clothing-heading">Clothing Pieces</h3>
+            <div id="customizer-clothing-slots" class="customizer-clothing-slots"></div>
+          </section>
+
+          <section class="customizer-section" aria-labelledby="customizer-colors-heading">
+            <h3 id="customizer-colors-heading">Colors</h3>
+            <div id="customizer-color-tabs" class="customizer-color-tabs" role="tablist" aria-label="Sprite color region"></div>
+            <div id="customizer-color-swatches" class="customizer-color-swatches" role="group" aria-label="Preset colors"></div>
+            <label class="customizer-custom-color-row" for="customizer-color-picker">
+              <span>Custom Color</span>
+              <span class="customizer-color-picker-wrap">
+                <input id="customizer-color-picker" type="color" value="#ff625a" />
+                <code id="customizer-color-hex">#FF625A</code>
+              </span>
+            </label>
+          </section>
+        </div>
+      </div>
+      <div class="customizer-footer">
+        <button id="customizer-done" class="dialog-primary" type="button">Done</button>
+      </div>
     </div>
   </dialog>
 

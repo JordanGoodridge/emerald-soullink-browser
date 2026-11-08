@@ -45,6 +45,7 @@ import {
   saveSlotForMode,
 } from './run/run-settings.mjs';
 import { createGameLibrary } from './ui/game-library.mjs';
+import { createCharacterCustomizerView } from './ui/character-customizer-view.mjs';
 import { revealLibrary } from './ui/library-readiness.mjs';
 import { createGameMenu } from './ui/game-menu.mjs';
 import { createFramePacer } from './frame-pacer.mjs';
@@ -191,9 +192,25 @@ const objectEventSpriteFlags = new Uint8Array(128);
 // The loaded pack configures its own sheets (or an empty set) during start().
 const presence = createPresenceRuntime({ avatarSheets: [] });
 const presenceLobby = createLobby({ runtime: presence });
+function syncCharacterCustomization(compiled = characterCustomizer?.getCompiled?.()) {
+  if (!compiled) return;
+  presence.setCustomAvatarSheet?.(compiled.appearanceKey, compiled.walkingRgba);
+  if (instance && u8 && u16) {
+    if (typeof runtimeAdapter?.applyCharacterCustomization === 'function') {
+      runtimeAdapter.applyCharacterCustomization(compiled);
+    } else {
+      emeraldCompat.applyEmeraldCharacterCustomization?.(instance.exports, { u8, u16, u32 }, compiled);
+    }
+  }
+}
+const characterCustomizer = createCharacterCustomizerView({
+  gameId: selectedGameId || 'emerald',
+  onChange: (compiled) => syncCharacterCustomization(compiled),
+});
 const gameLibrary = createGameLibrary({
   onOpen: openGame,
   onSettings: () => openSettingsDialog(),
+  onCustomize: (gameId) => characterCustomizer.open({ gameId }),
 });
 const gameMenu = createGameMenu({ onAction: handleGameMenuAction });
 
@@ -1227,6 +1244,7 @@ async function boot(saveBytes, { continueSavedGame = false } = {}) {
   sceneAdapter?.setMode?.(instance, visualModeController.activeVisualMode);
   if (automate) window.pokeemerald.automation = automationApi();
   refreshViews();
+  syncCharacterCustomization();
   refreshFrameImage();
   loadFlashSave(saveBytes);
   writeKeys();
@@ -1239,6 +1257,7 @@ async function boot(saveBytes, { continueSavedGame = false } = {}) {
       throw new Error('The saved multiplayer game could not be loaded');
     }
   }
+  syncCharacterCustomization();
   currentFrame = 0;
   framePacer.reset();
   resetFpsCounters();
@@ -1583,6 +1602,11 @@ async function start() {
         : avatarSheetsFromManifest(packManifest, packManifestUrl) ?? [],
       enabled: packManifest.capabilities?.presence !== 'none',
     });
+    const compiledCustomization = characterCustomizer.setGameContext({
+      gameId: selectedGameId,
+      manifest: packManifest,
+    });
+    presence.setCustomAvatarSheet?.(compiledCustomization.appearanceKey, compiledCustomization.walkingRgba);
     applyCapabilities(packManifest);
     saveStore = createSaveStore({
       gameId: selectedGameId,

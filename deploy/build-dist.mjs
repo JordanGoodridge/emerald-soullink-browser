@@ -62,6 +62,13 @@ await copyTree(
   join(dist, 'graphics', 'pokemon'),
   (name) => name === 'front.png',
 );
+for (const personDir of ['brendan', 'ruby_sapphire_brendan']) {
+  await copyTree(
+    join(game, 'graphics', 'object_events', 'pics', 'people', personDir),
+    join(dist, 'graphics', 'object_events', 'pics', 'people', personDir),
+    (name) => name.endsWith('.png'),
+  );
+}
 await copyTree(
   join(game, 'web'),
   join(dist, 'web'),

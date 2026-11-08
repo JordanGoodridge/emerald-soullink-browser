@@ -4,6 +4,7 @@
 #include "battle_main.h"
 #include "data.h"
 #include "event_data.h"
+#include "event_object_movement.h"
 #include "field_control_avatar.h"
 #include "fieldmap.h"
 #include "field_screen_effect.h"
@@ -721,6 +722,7 @@ static void WasmRunApplyPostStarterFlags(u32 starterSpecies)
     FlagSet(FLAG_ADVENTURE_STARTED);
     FlagSet(FLAG_SYS_POKEDEX_GET);
     FlagSet(FLAG_RECEIVED_POKEDEX_FROM_BIRCH);
+    EnableNationalPokedex();
     FlagSet(FLAG_HIDE_ROUTE_101_BIRCH_ZIGZAGOON_BATTLE);
     FlagSet(FLAG_HIDE_ROUTE_101_BIRCH_STARTERS_BAG);
     FlagSet(FLAG_HIDE_ROUTE_101_ZIGZAGOON);
@@ -1006,5 +1008,66 @@ u32 WasmRunFlushPendingReleases(void)
         WasmRunOnPartyWipe(livingCount == 0);
     }
     return releasedCount;
+}
+
+extern u32 gObjectEventPic_BrendanNormal[];
+extern u32 gObjectEventPic_BrendanRunning[];
+extern u16 gObjectEventPal_Brendan[];
+extern u16 gObjectEventPal_BrendanReflection[];
+void RequestSpriteFrameImageCopy(u16 index, u16 tileNum, const struct SpriteFrameImage *images);
+
+#define WASM_OBJ_EVENT_PAL_TAG_BRENDAN 0x1100
+
+u16 *WasmPlayerPaletteBuffer(void)
+{
+    return gObjectEventPal_Brendan;
+}
+
+u16 *WasmPlayerReflectionPaletteBuffer(void)
+{
+    return gObjectEventPal_BrendanReflection;
+}
+
+u8 *WasmPlayerNormalPicBuffer(void)
+{
+    return (u8 *)gObjectEventPic_BrendanNormal;
+}
+
+u8 *WasmPlayerRunningPicBuffer(void)
+{
+    return (u8 *)gObjectEventPic_BrendanRunning;
+}
+
+void WasmApplyPlayerCustomization(void)
+{
+    if (gSaveBlock1Ptr == NULL || gMain.inBattle)
+        return;
+    if (gSaveBlock2Ptr != NULL && gSaveBlock2Ptr->playerGender != MALE)
+        return;
+
+    LoadPlayerObjectReflectionPalette(WASM_OBJ_EVENT_PAL_TAG_BRENDAN, PALSLOT_PLAYER);
+    CpuCopy16(
+        &gPlttBufferFaded[OBJ_PLTT_ID(PALSLOT_PLAYER)],
+        (u16 *)OBJ_PLTT + OBJ_PLTT_ID(PALSLOT_PLAYER),
+        PLTT_SIZE_4BPP
+    );
+
+    if (gPlayerAvatar.spriteId < MAX_SPRITES && gSprites[gPlayerAvatar.spriteId].inUse)
+    {
+        struct Sprite *sprite = &gSprites[gPlayerAvatar.spriteId];
+        if (sprite->images != NULL && sprite->anims != NULL)
+        {
+            s16 imageValue = sprite->anims[sprite->animNum][sprite->animCmdIndex].frame.imageValue;
+            if (imageValue >= 0)
+            {
+                RequestSpriteFrameImageCopy((u16)imageValue, sprite->oam.tileNum, sprite->images);
+                CpuCopy16(
+                    sprite->images[imageValue].data,
+                    (u8 *)OBJ_VRAM0 + TILE_SIZE_4BPP * sprite->oam.tileNum,
+                    sprite->images[imageValue].size
+                );
+            }
+        }
+    }
 }
 #endif // WASM

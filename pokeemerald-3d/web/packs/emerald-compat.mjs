@@ -58,11 +58,15 @@ export function createEmeraldCompatibilityContext() {
         saveGame() {
           return context.shared.emeraldSaveGame(runtime.exports, context.getMemoryViews?.());
         },
+        applyCharacterCustomization(compiled) {
+          return applyEmeraldCharacterCustomization(runtime.exports, context.getMemoryViews?.(), compiled);
+        },
       };
     },
     emeraldFlashView,
     emeraldTrainerId,
     emeraldSaveGame,
+    applyEmeraldCharacterCustomization,
     legacyRunSettings(gameId, storage, legacyKey) {
       return gameId === 'emerald' ? storage.getItem(legacyKey) : null;
     },
@@ -95,4 +99,41 @@ export function emeraldSaveGame(exports, views) {
     views.u8[saveBlock1 + 0x0c + i] = views.u8[saveBlock1 + 0x04 + i];
   }
   return exports.TrySavingData(0);
+}
+
+export function applyEmeraldCharacterCustomization(exports, views, compiled) {
+  if (!exports || !views?.u8 || !views?.u16 || !compiled) return false;
+  let applied = false;
+  if (compiled.gbaPalette16?.length === 16 && typeof exports.WasmPlayerPaletteBuffer === 'function') {
+    const ptr = exports.WasmPlayerPaletteBuffer() >>> 0;
+    if (ptr) {
+      views.u16.set(compiled.gbaPalette16, ptr >>> 1);
+      applied = true;
+    }
+  }
+  if (compiled.gbaReflectionPalette16?.length === 16 && typeof exports.WasmPlayerReflectionPaletteBuffer === 'function') {
+    const ptr = exports.WasmPlayerReflectionPaletteBuffer() >>> 0;
+    if (ptr) {
+      views.u16.set(compiled.gbaReflectionPalette16, ptr >>> 1);
+      applied = true;
+    }
+  }
+  if (compiled.walking4bpp?.byteLength === 2304 && typeof exports.WasmPlayerNormalPicBuffer === 'function') {
+    const ptr = exports.WasmPlayerNormalPicBuffer() >>> 0;
+    if (ptr) {
+      views.u8.set(compiled.walking4bpp, ptr);
+      applied = true;
+    }
+  }
+  if (compiled.running4bpp?.byteLength === 2304 && typeof exports.WasmPlayerRunningPicBuffer === 'function') {
+    const ptr = exports.WasmPlayerRunningPicBuffer() >>> 0;
+    if (ptr) {
+      views.u8.set(compiled.running4bpp, ptr);
+      applied = true;
+    }
+  }
+  if (applied && typeof exports.WasmApplyPlayerCustomization === 'function') {
+    exports.WasmApplyPlayerCustomization();
+  }
+  return applied;
 }
