@@ -208,6 +208,21 @@ test('custom headwear (kitten-ears, wizard-hat, royal-crown, dojo-headband) and 
       `head/ear RGBA byte ${i} should not change when Shirt or Pants colors change`,
     );
   }
+
+  // Verify changing 2nd Color / Trim ('trim') recolors inner cat ears & kitty nose without changing Shirt or Bag:
+  const goldTrimNeko = compileCharacterCustomization({
+    equipped: { head: 'kitten-ears', accessory: 'cat-whiskers' },
+    colors: { trim: '#ffc55a' },
+  }, { gameId: 'emerald' });
+  let trimHeadDiffs = 0;
+  for (let i = 0; i < 21 * sheetWidth * 4; i++) {
+    if (goldTrimNeko.walkingRgba[i] !== baseNeko.walkingRgba[i]) trimHeadDiffs++;
+  }
+  assert.ok(trimHeadDiffs > 0, 'expected changing 2nd Color / Trim to update inner ear and nose RGBA pixels');
+  // Torso/bottom RGBA pixels remain identical when only 'trim' changes (and no neck accessory is worn):
+  for (let i = 22 * sheetWidth * 4; i < 32 * sheetWidth * 4; i++) {
+    assert.equal(goldTrimNeko.walkingRgba[i], baseNeko.walkingRgba[i]);
+  }
 });
 
 test('multi-game catalog supports per-game clothing extensions and new protagonist rigs', () => {

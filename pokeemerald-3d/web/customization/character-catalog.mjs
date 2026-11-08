@@ -187,19 +187,43 @@ function stampDirectionalRows(indexed, width, height, kind, rowsByDir, {
   }
 }
 
+// Emerald Bandana Hat transform: when the player picks a custom 2nd Color / Trim,
+// remaps the head bandana pixels (10/11) to trim indices (6/7) on head rows so
+// the bandana can be recolored independently of the backpack.
+function applyEmeraldHatTransform(indexed, width = 144, height = 32, _kind = 'walkingIndexed', normalized = null) {
+  const trimHex = normalizeHexColor(normalized?.colors?.trim, '#ff94c2');
+  if (trimHex === '#ff94c2') return;
+  const maxOffset = Math.min(height, 22) * width;
+  for (let i = 0; i < maxOffset; i++) {
+    if (indexed[i] === 10) indexed[i] = 6;
+    else if (indexed[i] === 11) indexed[i] = 7;
+  }
+}
+
+// Ruby / Sapphire Cap transform: remaps the front cap emblem pixels (12/13) on
+// the head rows to trim indices (6/7) so Shirt & Shoes never bleeds into the cap
+// and 2nd Color / Trim controls the emblem color.
+function applyRsCapTransform(indexed, width = 144, height = 32) {
+  const maxOffset = Math.min(height, 22) * width;
+  for (let i = 0; i < maxOffset; i++) {
+    if (indexed[i] === 12) indexed[i] = 6;
+    else if (indexed[i] === 13) indexed[i] = 7;
+  }
+}
+
 // Kitten Ears transform: removes the bulky white cap and green headband,
 // lowering the crown roof to row 14 so two tall, unmistakable 4px triangular
 // cat ears rise cleanly above sleek dark hair (index 8) and parted bangs.
-// Uses only F/8 (fixed dark outlines/hair), E/9 (Hat / Hair color), and 3 (warm
-// rosy inner-ear tone) so Shirt & Shoes (C/D) and Pants (5/6/7) never bleed in.
+// Uses F/8 (fixed dark outlines/hair), E/9 (Hat / Hair 1st color), and 6/7
+// (2nd Color / Trim for inner ear tufts) so Shirt & Shoes (C/D) never bleed in.
 function applyKittenEarsTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
       [9,  '................'],
       [10, '..88........88..'],
       [11, '.8EE8......8EE8.'],
-      [12, '.8E3E8....8E3E8.'],
-      [13, '.8E33E8888E33E8.'],
+      [12, '.8E6E8....8E6E8.'],
+      [13, '.8E67E8888E76E8.'],
       [14, '..89EEEEEEEE98..'],
       [15, '..F8888888888F..'],
       [16, '..F8888888888F..'],
@@ -222,8 +246,8 @@ function applyKittenEarsTransform(indexed, width = 144, height = 32, kind = 'wal
       [9,  '................'],
       [10, '...88...88......'],
       [11, '..8EE8.8EE8.....'],
-      [12, '..8E38.8E3E8....'],
-      [13, '..89988E33E98...'],
+      [12, '..8E68.8E6E8....'],
+      [13, '..89988E67E98...'],
       [14, '..89EEEEEEEE98..'],
       [15, '..F8888888888F..'],
       [16, '..F8888888888F..'],
@@ -233,7 +257,7 @@ function applyKittenEarsTransform(indexed, width = 144, height = 32, kind = 'wal
 }
 
 // Mystic Wizard Hat transform: tall curved spellcaster spire (E/9 Hat color),
-// accent ribbon band (A/B Bandana & Bag color) with a center clasp, and a wide
+// 2nd Color / Trim ribbon band (6/7) with a center clasp, and a wide
 // 16px flared brim using fixed dark outlines (8/F) instead of Pants index 5.
 function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
@@ -246,8 +270,8 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
       [11, '....8EEEEEE998..'],
       [12, '...8EEEEEEE998..'],
       [13, '...89999999998..'],
-      [14, '..8AAABEEBAAA8..'],
-      [15, '..8BBBBEEBBBB8..'],
+      [14, '..86667EE76668..'],
+      [15, '..87777EE77778..'],
       [16, '.F8EEEEEEEEEE8F.'],
       [17, 'FF9999EEEE9999FF'],
     ],
@@ -260,8 +284,8 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
       [11, '..899EEEEEE8....'],
       [12, '..899EEEEEEE8...'],
       [13, '..89999999998...'],
-      [14, '..8AAAAAAAAAA8..'],
-      [15, '..8BBBBBBBBBB8..'],
+      [14, '..866666666668..'],
+      [15, '..877777777778..'],
       [16, '.F899EEEEEE998F.'],
       [17, 'FF999999999999FF'],
     ],
@@ -274,8 +298,8 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
       [11, '....8EEEEEEE998.'],
       [12, '...8EEEEEEEE998.'],
       [13, '...899999999998.'],
-      [14, '..8AAAAAAAAAAA8.'],
-      [15, '..8BBBBBBBBBBB8.'],
+      [14, '..8666666666668.'],
+      [15, '..8777777777778.'],
       [16, '.F8EEEEEEEEEEE8F'],
       [17, 'FF999999999999FF'],
     ],
@@ -283,7 +307,7 @@ function applyWizardHatTransform(indexed, width = 144, height = 32, kind = 'walk
 }
 
 // Champion Crown transform: three-spiked royal coronet colored by Hat / Hair (E/9)
-// with an Accent center jewel and base rim (A/B) atop natural dark hair (8/F).
+// with a 2nd Color / Trim center jewel and base rim (6/7) atop natural dark hair (8/F).
 function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
@@ -292,8 +316,8 @@ function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'wal
       [11, '..8....88....8..'],
       [12, '.8E8..8EE8..8E8.'],
       [13, '.8EE88EEEE88EE8.'],
-      [14, '..899EAAAAE998..'],
-      [15, '..FBBBBBBBBBBF..'],
+      [14, '..899E6666E998..'],
+      [15, '..F7777777777F..'],
       [16, '..F8888888888F..'],
       [17, '.43888111188834.'],
     ],
@@ -304,7 +328,7 @@ function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'wal
       [12, '.8E8..8EE8..8E8.'],
       [13, '.8EE88EEEE88EE8.'],
       [14, '..899EEEEEE998..'],
-      [15, '..FBBBBBBBBBBF..'],
+      [15, '..F7777777777F..'],
       [16, '..F8888888888F..'],
       [17, '..F8888888888F..'],
       [18, '.43F88888888F34.'],
@@ -316,8 +340,8 @@ function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'wal
       [11, '..8...8....8....'],
       [12, '.8E8.8E8..8E8...'],
       [13, '.8EE8EEE88EE8...'],
-      [14, '..8EAEEEEEE98...'],
-      [15, '..FBBBBBBBBBF...'],
+      [14, '..8E6EEEEEE98...'],
+      [15, '..F777777777F...'],
       [16, '..F8888888888F..'],
       [17, '..48888888888F..'],
     ],
@@ -325,7 +349,7 @@ function applyRoyalCrownTransform(indexed, width = 144, height = 32, kind = 'wal
 }
 
 // Dojo Headband transform: spiky hair colored by Hat / Hair (E/9) with dark
-// outlines (8/F) and a 2-row tied martial-arts headband colored by Bandana & Bag (A/B).
+// outlines (8/F) and a 2-row tied martial-arts headband colored by 2nd Color / Trim (6/7).
 function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
@@ -335,8 +359,8 @@ function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'w
       [12, '...88EE88EE88...'],
       [13, '..8EE9EEEE9EE8..'],
       [14, '..899999999998..'],
-      [15, '..FAAAAAAAAAAF..'],
-      [16, '..FBBBBBBBBBBF..'],
+      [15, '..F6666666666F..'],
+      [16, '..F7777777777F..'],
       [17, '.43888111188834.'],
     ],
     up: [
@@ -346,10 +370,10 @@ function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'w
       [12, '...88EE88EE88...'],
       [13, '..8EE9EEEE9EE8..'],
       [14, '..899999999998..'],
-      [15, '..FAAAAFFAAAAF..'],
-      [16, '..FBBBBAABBBBF..'],
-      [17, '..F888BAAB888F..'],
-      [18, '.43F88B88B88F34.'],
+      [15, '..F6666FF6666F..'],
+      [16, '..F7777667777F..'],
+      [17, '..F8887667888F..'],
+      [18, '.43F88788788F34.'],
       [19, '.43488888888434.'],
     ],
     left: [
@@ -359,51 +383,51 @@ function applyDojoHeadbandTransform(indexed, width = 144, height = 32, kind = 'w
       [12, '..88EE88EE88....'],
       [13, '..8EE9EEEEEE8...'],
       [14, '..89999999998...'],
-      [15, '..FAAAAAAAAAA8A8'],
-      [16, '..FBBBBBBBBBB8B8'],
+      [15, '..F6666666666868'],
+      [16, '..F7777777777878'],
       [17, '..48888888888F..'],
     ],
   }, { clearDots: true });
 }
 
-// Kitty Nose & Whiskers accessory overlay: places a 2px rosy button nose (index 3)
-// right between the eyes (x=7..8) and dark whisker ticks (F) on the outer cheeks.
+// Kitty Nose & Whiskers accessory overlay: places a 2px button nose (index 6,
+// 2nd Color / Trim) between the eyes (x=7..8) and dark whisker ticks (F) on the cheeks.
 function applyCatWhiskersAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
     const { dir, isRun, topDy, dx } = getFrameHeadMetrics(f, kind);
     if (dir === 'down') {
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '  F    33    F  ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  F    66    F  ', { dx, clearDots: false });
       if (isRun) {
         stampFrameRow(indexed, width, height, f, 21 + topDy, '      2  2      ', { dx, clearDots: false });
       }
     } else if (dir === 'left') {
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '  3   F         ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  6   F         ', { dx, clearDots: false });
     }
   }
 }
 
-// Squirtle Squad Shades accessory overlay: sleek 2-row dark sunglasses across
-// the eye rows with a visible nose bridge (11), white lens glint (E), and exposed chin below.
+// Squirtle Squad Shades accessory overlay: sleek 2-row sunglasses across the eye
+// rows with a visible nose bridge (11), white lens glint (E), and 2nd Color / Trim lens tint (7).
 function applyCoolShadesAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
     const { dir, isRun, topDy, dx } = getFrameHeadMetrics(f, kind);
     if (dir === 'down') {
       stampFrameRow(indexed, width, height, f, 19 + topDy, '  FFFFFFFFFFFF  ', { dx, clearDots: false });
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '   FE8F11FE8F   ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '   FE7F11FE7F   ', { dx, clearDots: false });
       if (isRun) {
         stampFrameRow(indexed, width, height, f, 21 + topDy, '      2  2      ', { dx, clearDots: false });
       }
     } else if (dir === 'left') {
       stampFrameRow(indexed, width, height, f, 19 + topDy, '  FFFFFFF       ', { dx, clearDots: false });
-      stampFrameRow(indexed, width, height, f, 20 + topDy, '  FE8F          ', { dx, clearDots: false });
+      stampFrameRow(indexed, width, height, f, 20 + topDy, '  FE7F          ', { dx, clearDots: false });
     }
   }
 }
 
 // Floating Halo accessory overlay: delicate 2-row luminous ring hovering just
-// above the head (uses 8/E/9 so Pants index 5 never bleeds into the halo).
+// above the head (outer ring E, inner glow 6 from 2nd Color / Trim).
 function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   const frames = Math.floor(width / 16);
   for (let f = 0; f < frames; f++) {
@@ -422,28 +446,28 @@ function applyAngelHaloAccessory(indexed, width = 144, height = 32, kind = 'walk
     const baseY = (hasTallSpire ? 3 : 7) + eyeDy;
     const shiftX = dx + (dir === 'left' ? -1 : 0);
     stampFrameRow(indexed, width, height, f, baseY, '    8EEEEEE8    ', { dx: shiftX, clearDots: true });
-    stampFrameRow(indexed, width, height, f, baseY + 1, '   8E99..99E8   ', { dx: shiftX, clearDots: true });
+    stampFrameRow(indexed, width, height, f, baseY + 1, '   8E66..66E8   ', { dx: shiftX, clearDots: true });
   }
 }
 
-// Champion Scarf accessory overlay: wraps an accent scarf (A/B) with fixed dark
-// outline (8) around the neck and collar so Pants index 5 never bleeds in.
+// Champion Scarf accessory overlay: wraps a 2nd Color / Trim scarf (6/7) with
+// fixed dark outline (8) around the neck and collar.
 function applyHeroScarfAccessory(indexed, width = 144, height = 32, kind = 'walkingIndexed') {
   stampDirectionalRows(indexed, width, height, kind, {
     down: [
-      [22, '   8AAAAAAAA8   '],
-      [23, '   8BBBBAAAB8   '],
-      [24, '        8AB8    '],
+      [22, '   8666666668   '],
+      [23, '   8777766678   '],
+      [24, '        8678    '],
     ],
     up: [
-      [22, '   8AAAAAAAA8   '],
-      [23, '   8BBBBAAAB8   '],
-      [24, '       8AAB8    '],
+      [22, '   8666666668   '],
+      [23, '   8777766678   '],
+      [24, '       86678    '],
     ],
     left: [
-      [22, '   8AAAAAAA8    '],
-      [23, '    8BBBBAAAB8  '],
-      [24, '         8AABB8 '],
+      [22, '   866666668    '],
+      [23, '    8777766678  '],
+      [24, '         866778 '],
     ],
   }, { clearDots: false });
 }
@@ -485,12 +509,14 @@ function createGen3BrendanRig() {
             label: 'Emerald Bandana Hat',
             description: 'Default Emerald white cap with headband wrap',
             sourceSheet: 'emerald',
+            transform: applyEmeraldHatTransform,
           },
           {
             id: 'rs-cap',
             label: 'Ruby / Sapphire Cap',
             description: 'Classic Hoenn emblem cap without bandana wrap',
             sourceSheet: 'rs',
+            transform: applyRsCapTransform,
           },
           {
             id: 'kitten-ears',
@@ -614,6 +640,38 @@ function createGen3BrendanRig() {
     ],
     colorAspects: [
       {
+        id: 'head',
+        label: 'Hat / Hair',
+        paletteIndices: [14, 9],
+        defaultHex: '#ffffff',
+        swatches: [
+          { id: 'classic-white', label: 'Classic White', hex: '#ffffff', ramp: [[255, 255, 255], [222, 230, 238]] },
+          { id: 'midnight-black', label: 'Midnight Black', hex: '#4a5263', ramp: [[74, 82, 99], [41, 49, 65]] },
+          { id: 'ash-red', label: 'League Red', hex: '#ff635a', ramp: [[255, 99, 90], [197, 57, 57]] },
+          { id: 'sky-blue', label: 'Sky Blue', hex: '#73b5ff', ramp: [[115, 181, 255], [74, 131, 205]] },
+          { id: 'sand-gold', label: 'Sand Blonde', hex: '#ffe69c', ramp: [[255, 230, 156], [213, 180, 106]] },
+          { id: 'mint-cap', label: 'Mint Green', hex: '#8ce6b5', ramp: [[140, 230, 181], [90, 172, 131]] },
+          { id: 'sakura-pink', label: 'Sakura Pink', hex: '#ff94c2', ramp: [[255, 148, 194], [213, 107, 156]] },
+          { id: 'calico-orange', label: 'Calico Orange', hex: '#ff9c4a', ramp: [[255, 156, 74], [205, 107, 41]] },
+        ],
+      },
+      {
+        id: 'trim',
+        label: '2nd Color / Trim',
+        paletteIndices: [6, 7],
+        defaultHex: '#ff94c2',
+        swatches: [
+          { id: 'trim-sakura', label: 'Sakura Pink', hex: '#ff94c2', ramp: [[255, 148, 194], [197, 98, 148]] },
+          { id: 'trim-crimson', label: 'Crimson Red', hex: '#ff5a52', ramp: [[255, 90, 82], [189, 49, 49]] },
+          { id: 'trim-gold', label: 'Ruby Gold', hex: '#ffc55a', ramp: [[255, 197, 90], [189, 131, 41]] },
+          { id: 'trim-emerald', label: 'Emerald Green', hex: '#73cd73', ramp: [[115, 205, 115], [74, 148, 82]] },
+          { id: 'trim-cobalt', label: 'Cobalt Blue', hex: '#529cff', ramp: [[82, 156, 255], [49, 98, 189]] },
+          { id: 'trim-amethyst', label: 'Amethyst', hex: '#b573ff', ramp: [[181, 115, 255], [123, 65, 189]] },
+          { id: 'trim-frost', label: 'Frost White', hex: '#e6eef7', ramp: [[230, 238, 247], [164, 180, 197]] },
+          { id: 'trim-obsidian', label: 'Obsidian', hex: '#313942', ramp: [[65, 74, 90], [24, 33, 49]] },
+        ],
+      },
+      {
         id: 'top',
         label: 'Shirt & Shoes',
         paletteIndices: [12, 13],
@@ -646,32 +704,16 @@ function createGen3BrendanRig() {
         ],
       },
       {
-        id: 'head',
-        label: 'Hat / Hair',
-        paletteIndices: [14, 9],
-        defaultHex: '#ffffff',
-        swatches: [
-          { id: 'classic-white', label: 'Classic White', hex: '#ffffff', ramp: [[255, 255, 255], [222, 230, 238]] },
-          { id: 'midnight-black', label: 'Midnight Black', hex: '#4a5263', ramp: [[74, 82, 99], [41, 49, 65]] },
-          { id: 'ash-red', label: 'League Red', hex: '#ff635a', ramp: [[255, 99, 90], [197, 57, 57]] },
-          { id: 'sky-blue', label: 'Sky Blue', hex: '#73b5ff', ramp: [[115, 181, 255], [74, 131, 205]] },
-          { id: 'sand-gold', label: 'Sand Blonde', hex: '#ffe69c', ramp: [[255, 230, 156], [213, 180, 106]] },
-          { id: 'mint-cap', label: 'Mint Green', hex: '#8ce6b5', ramp: [[140, 230, 181], [90, 172, 131]] },
-          { id: 'sakura-pink', label: 'Sakura Pink', hex: '#ff94c2', ramp: [[255, 148, 194], [213, 107, 156]] },
-          { id: 'calico-orange', label: 'Calico Orange', hex: '#ff9c4a', ramp: [[255, 156, 74], [205, 107, 41]] },
-        ],
-      },
-      {
         id: 'bottom',
         label: 'Pants',
-        paletteIndices: [5, 6, 7],
+        paletteIndices: [5],
         defaultHex: '#394a7b',
         swatches: [
-          { id: 'classic-navy', label: 'Classic Navy', hex: '#394a7b', ramp: [[57, 74, 123], [41, 57, 98], [24, 41, 82]] },
-          { id: 'jet-black', label: 'Jet Black', hex: '#313942', ramp: [[49, 57, 66], [33, 41, 49], [16, 24, 33]] },
-          { id: 'khaki-tan', label: 'Ranger Khaki', hex: '#b59c6b', ramp: [[181, 156, 107], [148, 123, 82], [107, 90, 57]] },
-          { id: 'forest-cargo', label: 'Forest Olive', hex: '#4a7352', ramp: [[74, 115, 82], [57, 90, 65], [33, 65, 41]] },
-          { id: 'maroon-denim', label: 'Maroon Denim', hex: '#8c4252', ramp: [[140, 66, 82], [107, 49, 65], [74, 33, 41]] },
+          { id: 'classic-navy', label: 'Classic Navy', hex: '#394a7b', ramp: [[57, 74, 123]] },
+          { id: 'jet-black', label: 'Jet Black', hex: '#313942', ramp: [[49, 57, 66]] },
+          { id: 'khaki-tan', label: 'Ranger Khaki', hex: '#b59c6b', ramp: [[181, 156, 107]] },
+          { id: 'forest-cargo', label: 'Forest Olive', hex: '#4a7352', ramp: [[74, 115, 82]] },
+          { id: 'maroon-denim', label: 'Maroon Denim', hex: '#8c4252', ramp: [[140, 66, 82]] },
         ],
       },
       {

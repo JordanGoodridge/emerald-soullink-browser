@@ -167,7 +167,19 @@ function decodeRigSheetCache(schema) {
   return decoded;
 }
 
-function compositeIndexedMotionSheet(kind, schema, normalized, sheetCache) {
+function isCustomTrimActive(schema, normalized) {
+  const trimAspect = (schema.colorAspects ?? []).find((entry) => entry.id === 'trim');
+  if (!trimAspect) return false;
+  const currentHex = normalizeHexColor(normalized.colors?.trim, trimAspect.defaultHex);
+  const isCustomHex = currentHex !== normalizeHexColor(trimAspect.defaultHex);
+  const headSlot = (schema.clothingSlots ?? []).find((entry) => entry.id === 'head');
+  const defaultHeadId = headSlot?.defaultItemId ?? 'emerald-hat';
+  const equippedHead = normalized.equipped?.head ?? defaultHeadId;
+  const equippedAccessory = normalized.equipped?.accessory ?? 'none';
+  return isCustomHex || equippedHead !== defaultHeadId || (Boolean(equippedAccessory) && equippedAccessory !== 'none');
+}
+
+function compositeIndexedMotionSheet(kind, schema, normalized, sheetCache, customTrimActive = false) {
   const frameWidth = schema.frameWidth ?? 16;
   const frameHeight = schema.frameHeight ?? 32;
   const frameCount = schema.frameCount ?? 9;
@@ -188,11 +200,15 @@ function compositeIndexedMotionSheet(kind, schema, normalized, sheetCache) {
       const startOffset = Math.max(0, yStart) * sheetWidth;
       const endOffset = Math.min(frameHeight - 1, yEnd + 1) * sheetWidth;
       for (let i = startOffset; i < endOffset; i++) {
-        composited[i] = source[i];
+        const px = source[i];
+        // When custom 2nd Color / Trim (indices 6, 7) is active, remap any stray
+        // vanilla index-6 shadow pixels in the base sheet to 8 (dark outline)
+        // before running slot transforms so indices 6 and 7 are 100% isolated.
+        composited[i] = (customTrimActive && px === 6) ? 8 : px;
       }
     }
     if (typeof item.transform === 'function') {
-      item.transform(composited, sheetWidth, frameHeight, kind);
+      item.transform(composited, sheetWidth, frameHeight, kind, normalized, customTrimActive);
     }
   }
 
@@ -211,11 +227,15 @@ export function compileCharacterCustomization(customization, {
   const frameHeight = schema.frameHeight ?? 32;
   const frameCount = schema.frameCount ?? 9;
   const sheetWidth = frameWidth * frameCount;
+  const customTrimActive = isCustomTrimActive(schema, normalized);
 
   const paletteRgb = (schema.basePalette ?? []).map((rgb) => [...rgb]);
   const reflectionPaletteRgb = (schema.reflectionPalette ?? schema.basePalette ?? []).map((rgb) => [...rgb]);
 
   for (const aspect of schema.colorAspects ?? []) {
+    if (aspect.id === 'trim' && !customTrimActive) {
+      continue;
+    }
     const hex = normalizeHexColor(normalized.colors?.[aspect.id], aspect.defaultHex);
     const ramp = resolveAspectColorRamp(aspect, hex);
     const isDefault = hex === normalizeHexColor(aspect.defaultHex);
@@ -224,7 +244,7 @@ export function compileCharacterCustomization(customization, {
       const stopRgb = ramp[i] ?? ramp.at(-1);
       if (paletteIndex > 0 && paletteIndex < 16 && stopRgb) {
         paletteRgb[paletteIndex] = [...stopRgb];
-        if (!isDefault) {
+        if (!isDefault || aspect.id === 'trim') {
           reflectionPaletteRgb[paletteIndex] = buildReflectionColor(stopRgb);
         }
       }
@@ -239,8 +259,8 @@ export function compileCharacterCustomization(customization, {
   }
 
   const sheetCache = decodeRigSheetCache(schema);
-  const walkingIndexed = compositeIndexedMotionSheet('walkingIndexed', schema, normalized, sheetCache);
-  const runningIndexed = compositeIndexedMotionSheet('runningIndexed', schema, normalized, sheetCache);
+  const walkingIndexed = compositeIndexedMotionSheet('walkingIndexed', schema, normalized, sheetCache, customTrimActive);
+  const runningIndexed = compositeIndexedMotionSheet('runningIndexed', schema, normalized, sheetCache, customTrimActive);
 
   const walking4bpp = encodeGba4bppSheet(walkingIndexed, { frameWidth, frameHeight, frameCount });
   const running4bpp = encodeGba4bppSheet(runningIndexed, { frameWidth, frameHeight, frameCount });
