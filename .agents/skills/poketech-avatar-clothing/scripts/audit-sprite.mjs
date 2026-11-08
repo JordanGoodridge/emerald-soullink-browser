@@ -8,13 +8,14 @@
  *   node .agents/skills/poketech-avatar-clothing/scripts/audit-sprite.mjs --slot top --item rs-jacket --sheet running
  */
 import {
-  createDefaultCharacterSelection,
-  getCharacterRig,
+  resolveCharacterSchema,
 } from '../../../../pokeemerald-3d/web/customization/character-catalog.mjs';
 import {
-  composeCharacterBuffers,
-  decode4bppSheetToIndexedGrid,
+  compileCharacterCustomization,
 } from '../../../../pokeemerald-3d/web/customization/character-compositor.mjs';
+import {
+  createDefaultCustomization,
+} from '../../../../pokeemerald-3d/web/customization/character-store.mjs';
 
 const args = process.argv.slice(2);
 function getArg(flag, fallback = null) {
@@ -27,15 +28,14 @@ const item = getArg('--item', null);
 const sheetName = getArg('--sheet', 'walking');
 const maxFrames = Number(getArg('--frames', '3'));
 
-const rig = getCharacterRig('gen3-brendan');
-const custom = createDefaultCharacterSelection('gen3-brendan');
+const schema = resolveCharacterSchema({ rigId: 'gen3-brendan' });
+const custom = createDefaultCustomization(schema);
 if (slot && item) {
   custom.slots[slot] = item;
 }
 
-const composed = composeCharacterBuffers(custom, rig);
-const sheetBytes = sheetName === 'running' ? composed.runningPicBytes : composed.walkingPicBytes;
-const grid = decode4bppSheetToIndexedGrid(sheetBytes, 144, 32);
+const compiled = compileCharacterCustomization(custom, { schema });
+const grid = sheetName === 'running' ? compiled.runningIndexed : compiled.walkingIndexed;
 
 console.log(`=== Sprite Audit: slot=${slot || 'default'} item=${item || 'default'} sheet=${sheetName} ===`);
 console.log('Legend: . = 0(transparent) | 1,2 = skin | 3 = hair | 4,5 = bottom | 6,7 = trim | 8,9 = top | A,B = hat(10,11) | C = white(12) | D,E = grey(13,14) | F = outline(15)\n');
