@@ -526,6 +526,9 @@ export function createPresenceRuntime({
       colors: { ...(raw.colors ?? {}) },
       revision: selfCustomizationRevision,
     };
+    if (customization.appearanceKey && customization.walkingRgba) {
+      setCustomAvatarSheet(customization.appearanceKey, customization.walkingRgba);
+    }
     if (!client) return false;
     return client.publishAvatar?.(selfCustomization) ?? false;
   }

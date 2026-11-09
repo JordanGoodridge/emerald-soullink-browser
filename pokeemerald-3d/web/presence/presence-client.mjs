@@ -269,9 +269,10 @@ export function createPresenceClient({
       }
       case 'error': {
         const hasSession = Boolean(room && playerId && token);
-        const unrecoverable = ['room_not_found', 'session_expired', 'invalid_resume', 'incompatible_version'];
-        const isTerminal = unrecoverable.includes(message.code)
-          || (!hasSession && (message.fatal || ['room_full', 'run_in_progress', 'invalid_message', 'handshake_timeout'].includes(message.code)));
+        const unrecoverable = ['room_not_found', 'session_expired', 'invalid_resume', 'incompatible_version', 'invalid_message'];
+        const isTerminal = Boolean(message.fatal)
+          || unrecoverable.includes(message.code)
+          || (!hasSession && ['room_full', 'run_in_progress', 'handshake_timeout'].includes(message.code));
         fail(message.code, null, isTerminal);
         if (!isTerminal && hasSession) {
           try { socket?.close(4000, message.code); } catch { /* ignore */ }
