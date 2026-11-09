@@ -194,7 +194,7 @@ const presence = createPresenceRuntime({ avatarSheets: [] });
 const presenceLobby = createLobby({ runtime: presence });
 function syncCharacterCustomization(compiled = characterCustomizer?.getCompiled?.()) {
   if (!compiled) return;
-  presence.setCustomAvatarSheet?.(compiled.appearanceKey, compiled.walkingRgba);
+  presence.publishAvatar?.(compiled);
   if (instance && u8 && u16) {
     if (typeof runtimeAdapter?.applyCharacterCustomization === 'function') {
       runtimeAdapter.applyCharacterCustomization(compiled);
@@ -1606,7 +1606,7 @@ async function start() {
       gameId: selectedGameId,
       manifest: packManifest,
     });
-    presence.setCustomAvatarSheet?.(compiledCustomization.appearanceKey, compiledCustomization.walkingRgba);
+    presence.publishAvatar?.(compiledCustomization);
     applyCapabilities(packManifest);
     saveStore = createSaveStore({
       gameId: selectedGameId,

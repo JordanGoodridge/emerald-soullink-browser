@@ -200,6 +200,7 @@ export function startServer({
 
     if (command.type === 'presence') execute(service.presence(state.id, command));
     else if (command.type === 'party') execute(service.party(state.id, command));
+    else if (command.type === 'avatar') execute(service.avatar(state.id, command));
     else if (command.type === 'ping') execute(service.ping(state.id, command));
     else if (command.type === 'leave') execute(service.leave(state.id));
   }

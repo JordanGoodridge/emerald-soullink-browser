@@ -261,6 +261,51 @@ export function validatePartySnapshot(value) {
   return ok(result.party);
 }
 
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+export function validateAvatarCustomization(value) {
+  if (!isObject(value)) return fail(ERROR_CODES.invalidMessage, 'avatar must be an object');
+  if (!hasExactKeys(value, ['equipped', 'colors'], ['version', 'rigId', 'revision'])) {
+    return fail(ERROR_CODES.invalidMessage, 'avatar fields are invalid');
+  }
+  if (value.version !== undefined && value.version !== 1) {
+    return fail(ERROR_CODES.invalidMessage, 'invalid avatar version');
+  }
+  if (value.rigId !== undefined && (typeof value.rigId !== 'string' || !IDENTIFIER_RE.test(value.rigId))) {
+    return fail(ERROR_CODES.invalidMessage, 'invalid avatar rigId');
+  }
+  if (value.revision !== undefined && !isCounter(value.revision)) {
+    return fail(ERROR_CODES.invalidMessage, 'invalid avatar revision');
+  }
+  if (!isObject(value.equipped) || Object.keys(value.equipped).length > 16) {
+    return fail(ERROR_CODES.invalidMessage, 'invalid avatar equipped');
+  }
+  const equipped = {};
+  for (const [slotId, itemId] of Object.entries(value.equipped)) {
+    if (!IDENTIFIER_RE.test(slotId) || typeof itemId !== 'string' || !IDENTIFIER_RE.test(itemId)) {
+      return fail(ERROR_CODES.invalidMessage, 'invalid avatar equipped item');
+    }
+    equipped[slotId] = itemId;
+  }
+  if (!isObject(value.colors) || Object.keys(value.colors).length > 16) {
+    return fail(ERROR_CODES.invalidMessage, 'invalid avatar colors');
+  }
+  const colors = {};
+  for (const [aspectId, hex] of Object.entries(value.colors)) {
+    if (!IDENTIFIER_RE.test(aspectId) || typeof hex !== 'string' || !HEX_COLOR_RE.test(hex)) {
+      return fail(ERROR_CODES.invalidMessage, 'invalid avatar color');
+    }
+    colors[aspectId] = hex.toLowerCase();
+  }
+  return ok({
+    version: 1,
+    rigId: typeof value.rigId === 'string' ? value.rigId : 'gen3-brendan',
+    equipped,
+    colors,
+    revision: value.revision ?? 0,
+  });
+}
+
 function handshakeEnvelope(value, type, fields) {
   if (!hasExactKeys(value, ['v', 'type', ...fields])) {
     return fail(ERROR_CODES.invalidMessage, `${type} fields are invalid`);
@@ -356,6 +401,14 @@ export function validateClientMessage(value) {
       if (!party.ok) return party;
       return ok({ v: PROTOCOL_VERSION, type: 'party', party: party.value });
     }
+    case 'avatar': {
+      if (!hasExactKeys(value, ['v', 'type', 'avatar'])) {
+        return fail(ERROR_CODES.invalidMessage, 'avatar fields are invalid');
+      }
+      const avatar = validateAvatarCustomization(value.avatar);
+      if (!avatar.ok) return avatar;
+      return ok({ v: PROTOCOL_VERSION, type: 'avatar', avatar: avatar.value });
+    }
     default:
       return fail(ERROR_CODES.invalidMessage, 'unknown message type');
   }
@@ -381,6 +434,10 @@ export function rosterMessage({ revision, serverMs, members }) {
 
 export function partyMessage({ playerId, party }) {
   return serverEnvelope('party', { playerId, party });
+}
+
+export function avatarMessage({ playerId, avatar }) {
+  return serverEnvelope('avatar', { playerId, avatar });
 }
 
 export function presenceMessage(snapshot) {

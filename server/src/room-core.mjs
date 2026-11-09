@@ -6,6 +6,7 @@ import {
   DEFAULT_LIMITS,
   ERROR_CODES,
   ROOM_CAPACITY,
+  avatarMessage,
   errorMessage,
   partyMessage,
   presenceMessage,
@@ -131,6 +132,8 @@ export function createRoomService({
       lastWorld: null,
       party: null,
       lastPartyRevision: 0,
+      avatar: null,
+      lastAvatarRevision: 0,
     };
   }
 
@@ -141,6 +144,17 @@ export function createRoomService({
     for (const other of room.members.values()) {
       if (other.playerId === forPlayerId || !other.party) continue;
       effects.push(send(recipient.socketId, partyMessage({ playerId: other.playerId, party: other.party })));
+    }
+    return effects;
+  }
+
+  function avatarEffects(room, forPlayerId) {
+    const recipient = room.members.get(forPlayerId);
+    if (!recipient) return [];
+    const effects = [];
+    for (const other of room.members.values()) {
+      if (other.playerId === forPlayerId || !other.avatar) continue;
+      effects.push(send(recipient.socketId, avatarMessage({ playerId: other.playerId, avatar: other.avatar })));
     }
     return effects;
   }
@@ -196,6 +210,7 @@ export function createRoomService({
       ...welcomeEffects(room, member),
       ...rosterEffects(room, member.playerId),
       ...partyEffects(room, member.playerId),
+      ...avatarEffects(room, member.playerId),
     ];
   }
 
@@ -234,6 +249,7 @@ export function createRoomService({
     effects.push(...welcomeEffects(room, member));
     effects.push(...rosterEffects(room, member.playerId));
     effects.push(...partyEffects(room, member.playerId));
+    effects.push(...avatarEffects(room, member.playerId));
     return effects;
   }
 
@@ -344,6 +360,27 @@ export function createRoomService({
     return effects;
   }
 
+  function avatar(socketId, command) {
+    const binding = bindings.get(socketId);
+    if (!binding) return [];
+    const room = rooms.get(binding.roomCode);
+    if (!room) return [];
+    const member = room.members.get(binding.playerId);
+    if (!member || member.socketId !== socketId || member.connection !== 'connected') return [];
+    const snapshot = command.avatar;
+    if (!snapshot || typeof snapshot !== 'object') return [];
+    if (Number.isInteger(snapshot.revision) && snapshot.revision > 0) {
+      if (snapshot.revision <= member.lastAvatarRevision) return [];
+      member.lastAvatarRevision = snapshot.revision;
+    }
+    member.avatar = snapshot;
+    const effects = [];
+    for (const socket of connectedSockets(room, member.playerId)) {
+      effects.push(send(socket, avatarMessage({ playerId: member.playerId, avatar: snapshot })));
+    }
+    return effects;
+  }
+
   function tick() {
     const effects = [];
     const current = now();
@@ -429,6 +466,7 @@ export function createRoomService({
     disconnect,
     presence,
     party,
+    avatar,
     ping,
     tick,
     inspect,

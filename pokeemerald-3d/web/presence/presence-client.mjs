@@ -49,6 +49,7 @@ export function createPresenceClient({
   onRoster = noop,
   onPresence = noop,
   onParty = noop,
+  onAvatar = noop,
   onStatus = noop,
   onError = noop,
   onClock = noop,
@@ -72,6 +73,8 @@ export function createPresenceClient({
   let pendingDirty = false;
   let lastStateKey = null;
   let lastPartyRevision = -1;
+  let pendingAvatar = null;
+  let lastAvatarKey = null;
   let transitionTokens = limits.transitionBurst;
   let transitionUpdatedAt = 0;
   let handshakeDeadline = 0;
@@ -212,6 +215,10 @@ export function createPresenceClient({
           room, playerId, generation, revision, members, resumed: isResume,
         });
         sendPing();
+        if (pendingAvatar) {
+          lastAvatarKey = null;
+          publishAvatar(pendingAvatar);
+        }
         if (pendingState && pendingDirty) sendPresence();
         break;
       }
@@ -227,6 +234,11 @@ export function createPresenceClient({
       case 'party': {
         if (status !== 'joined') break;
         onParty(message.playerId, message.party);
+        break;
+      }
+      case 'avatar': {
+        if (status !== 'joined') break;
+        onAvatar(message.playerId, message.avatar);
         break;
       }
       case 'pong': {
@@ -372,6 +384,21 @@ export function createPresenceClient({
     if (revision !== null && revision === lastPartyRevision) return false;
     if (!send({ type: 'party', party })) return false;
     if (revision !== null) lastPartyRevision = revision;
+    return true;
+  }
+
+  function publishAvatar(avatar) {
+    if (!avatar || typeof avatar !== 'object') return false;
+    pendingAvatar = avatar;
+    if (status !== 'joined') return false;
+    const key = JSON.stringify({
+      rigId: avatar.rigId ?? 'gen3-brendan',
+      equipped: avatar.equipped ?? {},
+      colors: avatar.colors ?? {},
+    });
+    if (key === lastAvatarKey) return false;
+    if (!send({ type: 'avatar', avatar })) return false;
+    lastAvatarKey = key;
     return true;
   }
 
@@ -548,6 +575,7 @@ export function createPresenceClient({
     tick,
     publish,
     publishParty,
+    publishAvatar,
     flush,
     simulateDrop,
     getMetrics,

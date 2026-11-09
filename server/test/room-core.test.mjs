@@ -323,3 +323,38 @@ test('party relay drops stale revisions and passes hidden state through', () => 
   assert.equal(relayed.party.availability, 'hidden');
   assert.deepEqual(relayed.party.members, []);
 });
+
+test('avatar customizations broadcast to members and to later joiners', () => {
+  const h = harness();
+  h.create('s1', 'A');
+  const avatar1 = {
+    version: 1,
+    rigId: 'gen3-brendan',
+    equipped: { head: 'wizard-hat', top: 'rs-jacket' },
+    colors: { top: '#4a8cff' },
+    revision: 1,
+  };
+  assert.equal(h.service.avatar('s1', { type: 'avatar', avatar: avatar1 }).length, 0);
+
+  // A later joiner receives the stored avatar with the sender's player id.
+  const joined = h.join('s2', 'ABCD2345', 'B');
+  const toNewJoiner = messageOf(joined, 'avatar');
+  assert.equal(toNewJoiner.playerId, 'p1');
+  assert.deepEqual(toNewJoiner.avatar, avatar1);
+
+  // Publishes from an existing member broadcast to the other member.
+  const avatar2 = {
+    version: 1,
+    rigId: 'gen3-brendan',
+    equipped: { head: 'kitten-ears' },
+    colors: { head: '#ff94c2' },
+    revision: 1,
+  };
+  const relayed = h.service.avatar('s2', { type: 'avatar', avatar: avatar2 });
+  const broadcast = messageOf(relayed, 'avatar');
+  assert.equal(broadcast.playerId, 'p2');
+  assert.deepEqual(broadcast.avatar, avatar2);
+
+  // Duplicate or older revision is ignored.
+  assert.equal(h.service.avatar('s2', { type: 'avatar', avatar: avatar2 }).length, 0);
+});

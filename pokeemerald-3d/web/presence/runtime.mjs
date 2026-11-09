@@ -13,8 +13,14 @@ import {
 import { createPresenceClient } from './presence-client.mjs';
 import { createRemoteActorStore } from './remote-actors.mjs';
 import { createGameAdapter } from './game-adapter.mjs';
-import { createAvatarAtlas, loadAvatarAtlas, replaceAvatarSheetInAtlas } from './avatar-manifest.mjs';
+import {
+  createAvatarAtlas,
+  loadAvatarAtlas,
+  playerAppearanceKey,
+  replaceAvatarSheetInAtlas,
+} from './avatar-manifest.mjs';
 import { remotePresenterOptions } from './remote-renderer.mjs';
+import { compileCharacterCustomization } from '../customization/character-compositor.mjs';
 
 const NAME_STORAGE_KEY = 'pokeemerald.presence.name.v1';
 const RENDERABLE_ACTIVITIES = new Set(['overworld', 'dialogue', 'menu', 'cutscene']);
@@ -71,6 +77,8 @@ export function createPresenceRuntime({
   let activeAvatarSheets = avatarSheets;
   let activeMapNameFor = mapNameFor;
   const customAvatarRgbaByAppearance = new Map();
+  let selfCustomization = null;
+  let selfCustomizationRevision = 0;
   let active = Boolean(enabled);
   let isRoomCreator = false;
   let name = normalizeName(search.get('presenceName') || '') || readStoredName() || 'Player';
@@ -154,6 +162,12 @@ export function createPresenceRuntime({
         if (typeof playerId === 'string' && party) partyByPlayer.set(playerId, party);
         notify();
       },
+      onAvatar: (playerId, avatar) => {
+        if (typeof playerId === 'string' && avatar) {
+          applyPeerAvatarCustomization(playerId, avatar);
+          notify();
+        }
+      },
       onStatus: () => notify(),
       onClock: () => notify(),
       onError: (error) => {
@@ -161,10 +175,14 @@ export function createPresenceRuntime({
         if (error.terminal) {
           store.reset();
           partyByPlayer.clear();
+          customAvatarRgbaByAppearance.clear();
         }
         notify();
       },
     });
+    if (selfCustomization) {
+      created.publishAvatar?.(selfCustomization);
+    }
     return created;
   }
 
@@ -221,6 +239,7 @@ export function createPresenceRuntime({
       client = null;
     }
     store.reset();
+    customAvatarRgbaByAppearance.clear();
     lastClose = { code: 4000, reason: 'left' };
     notify();
   }
@@ -468,16 +487,47 @@ export function createPresenceRuntime({
     return true;
   }
 
-  function setCustomAvatarSheet(appearance, rgba) {
+  function setCustomAvatarSheet(appearance, rgba, playerId = null) {
     if (!appearance) return false;
+    const key = playerId ? playerAppearanceKey(playerId, appearance) : appearance;
     if (!rgba) {
-      customAvatarRgbaByAppearance.delete(appearance);
+      customAvatarRgbaByAppearance.delete(key);
       return false;
     }
-    customAvatarRgbaByAppearance.set(appearance, rgba);
-    const updated = replaceAvatarSheetInAtlas(avatarAtlas, appearance, rgba);
+    customAvatarRgbaByAppearance.set(key, rgba);
+    const updated = replaceAvatarSheetInAtlas(avatarAtlas, key, rgba);
     if (updated) notify();
     return updated;
+  }
+
+  function applyPeerAvatarCustomization(playerId, avatar) {
+    if (!playerId || !avatar || typeof avatar !== 'object') return false;
+    try {
+      const compiled = compileCharacterCustomization(avatar, {
+        rigId: typeof avatar.rigId === 'string' ? avatar.rigId : null,
+      });
+      return setCustomAvatarSheet(compiled.appearanceKey ?? 'brendan.on-foot', compiled.walkingRgba, playerId);
+    } catch (error) {
+      logger.warn?.('Peer avatar customization failed to compile:', error);
+      return false;
+    }
+  }
+
+  function publishAvatar(customization) {
+    if (!customization || typeof customization !== 'object') return false;
+    const raw = customization.customization && typeof customization.customization === 'object'
+      ? customization.customization
+      : customization;
+    selfCustomizationRevision++;
+    selfCustomization = {
+      version: 1,
+      rigId: typeof raw.rigId === 'string' ? raw.rigId : 'gen3-brendan',
+      equipped: { ...(raw.equipped ?? {}) },
+      colors: { ...(raw.colors ?? {}) },
+      revision: selfCustomizationRevision,
+    };
+    if (!client) return false;
+    return client.publishAvatar?.(selfCustomization) ?? false;
   }
 
   reloadAvatars();
@@ -488,6 +538,7 @@ export function createPresenceRuntime({
     setAdapter,
     setName,
     setCustomAvatarSheet,
+    publishAvatar,
     createRoom,
     joinRoom,
     leave,

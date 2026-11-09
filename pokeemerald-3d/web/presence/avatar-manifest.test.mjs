@@ -11,6 +11,7 @@ import {
   finalizeAvatarAtlas,
   ghostLayerFor,
   packAvatarSheet,
+  playerAppearanceKey,
   replaceAvatarSheetInAtlas,
 } from './avatar-manifest.mjs';
 import { compileCharacterCustomization } from '../customization/character-compositor.mjs';
@@ -132,4 +133,41 @@ test('replaceAvatarSheetInAtlas preserves black outline pixels (palette index 15
     }
   }
   assert.ok(blackOutlineCount > 0, 'expected compiled sheet to contain black [0, 0, 0] outline pixels');
+});
+
+test('allocates per-player custom avatar layers without overwriting the base appearance or other peers', () => {
+  const atlas = createAvatarAtlas();
+  packAvatarSheet(atlas, 'brendan.on-foot', syntheticSheet(), KEY);
+  finalizeAvatarAtlas(atlas);
+  assert.equal(atlas.solidLayerCount, 9);
+  assert.equal(atlas.layerCount, 18);
+
+  const peer1Compiled = compileCharacterCustomization({
+    equipped: { head: 'wizard-hat' },
+    colors: { top: '#4a8cff' },
+  }, { gameId: 'emerald' });
+  const peer2Compiled = compileCharacterCustomization({
+    equipped: { head: 'kitten-ears' },
+    colors: { top: '#ff94c2' },
+  }, { gameId: 'emerald' });
+
+  assert.equal(
+    replaceAvatarSheetInAtlas(atlas, playerAppearanceKey('p1', 'brendan.on-foot'), peer1Compiled.walkingRgba),
+    true,
+  );
+  assert.equal(
+    replaceAvatarSheetInAtlas(atlas, playerAppearanceKey('p2', 'brendan.on-foot'), peer2Compiled.walkingRgba),
+    true,
+  );
+
+  // Base brendan.on-foot stays at layers 0..8, p1 gets 9..17, p2 gets 18..26,
+  // and ghost layers shift cleanly to start at 27.
+  assert.equal(avatarLayerFor(atlas, 'brendan.on-foot', 0), 0);
+  assert.equal(avatarLayerFor(atlas, 'brendan.on-foot', 0, 'p1'), 9);
+  assert.equal(avatarLayerFor(atlas, 'brendan.on-foot', 0, 'p2'), 18);
+  assert.equal(avatarLayerFor(atlas, 'brendan.on-foot', 0, 'unknown-peer'), 0);
+  assert.equal(atlas.solidLayerCount, 27);
+  assert.equal(atlas.ghostOffset, 27);
+  assert.equal(atlas.layerCount, 54);
+  assert.equal(ghostLayerFor(atlas, avatarLayerFor(atlas, 'brendan.on-foot', 3, 'p2')), 27 + 18 + 3);
 });

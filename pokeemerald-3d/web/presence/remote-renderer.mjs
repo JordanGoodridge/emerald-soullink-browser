@@ -10,7 +10,7 @@ export function mapRemoteActors({ actors = [], selfPose, selfScreen, avatarAtlas
   const result = [];
   for (const actor of actors) {
     if (!actor?.pose) continue;
-    let layer = avatarLayerFor(avatarAtlas, actor.pose.appearance, actor.pose.frame);
+    let layer = avatarLayerFor(avatarAtlas, actor.pose.appearance, actor.pose.frame, actor.playerId);
     if (layer < 0) continue;
     // Battle markers use the translucent ghost copy of the same cell.
     if (actor.marker) layer = ghostLayerFor(avatarAtlas, layer);

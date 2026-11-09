@@ -477,3 +477,70 @@ test('setAway during a battle clears battleAnchor so the relay does not reject t
   assert.equal(publishedState?.pose, null);
   assert.equal(publishedState?.battleAnchor, null);
 });
+
+test('compiles per-peer avatar customizations into isolated atlas layers without overwriting local or default sheets', async () => {
+  const { createAvatarAtlas, packAvatarSheet, finalizeAvatarAtlas } = await import('./avatar-manifest.mjs');
+  const liveAtlas = createAvatarAtlas();
+  const baseSheet = new Uint8ClampedArray(144 * 32 * 4);
+  packAvatarSheet(liveAtlas, 'brendan.on-foot', baseSheet, [115, 197, 164]);
+  finalizeAvatarAtlas(liveAtlas);
+
+  let publishedAvatar = null;
+  const fake = fakeClientFactory();
+  fake.client.publishAvatar = (avatar) => {
+    publishedAvatar = avatar;
+    return true;
+  };
+  const runtime = createPresenceRuntime({
+    search: new URLSearchParams(),
+    url: 'ws://test',
+    adapter: fakeAdapter(),
+    clientFactory: fake.factory,
+    loadAvatars: async () => liveAtlas,
+    now: () => 100,
+    awayGraceMs: 0,
+  });
+  await Promise.resolve();
+  runtime.createRoom();
+
+  // Publishing local customization sends it to the client without overwriting default layer 0..8:
+  runtime.publishAvatar({
+    rigId: 'gen3-brendan',
+    equipped: { head: 'wizard-hat' },
+    colors: { top: '#4a8cff' },
+  });
+  assert.equal(publishedAvatar?.equipped?.head, 'wizard-hat');
+
+  // Receiving two peers with different outfits gives each peer distinct atlas layers:
+  fake.options.onWelcome({
+    members: [
+      { playerId: 'self', name: 'Self', generation: 1, connection: 'connected', latest: null },
+      { playerId: 'p2', name: 'May', generation: 1, connection: 'connected', latest: snapshot('p2', 120, 1) },
+      { playerId: 'p3', name: 'Brendan', generation: 1, connection: 'connected', latest: snapshot('p3', 136, 1) },
+    ],
+    revision: 2,
+  });
+  fake.options.onAvatar('p2', {
+    version: 1,
+    rigId: 'gen3-brendan',
+    equipped: { head: 'kitten-ears' },
+    colors: { top: '#ff94c2' },
+    revision: 1,
+  });
+  fake.options.onAvatar('p3', {
+    version: 1,
+    rigId: 'gen3-brendan',
+    equipped: { head: 'royal-crown' },
+    colors: { top: '#ffc55a' },
+    revision: 1,
+  });
+  runtime.tick();
+
+  const frame = runtime.frameOptions({ enhanced: true, sceneKind: 1 });
+  assert.equal(frame.remoteActors.length, 2);
+  const p2Actor = frame.remoteActors.find((a) => a.playerId === 'p2');
+  const p3Actor = frame.remoteActors.find((a) => a.playerId === 'p3');
+  assert.notEqual(p2Actor.layer, p3Actor.layer);
+  assert.equal(p2Actor.layer, 9);
+  assert.equal(p3Actor.layer, 18);
+});

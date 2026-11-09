@@ -10,7 +10,7 @@ export const AVATAR_CELL_HEIGHT = 32;
 export const AVATAR_SHEET_WIDTH = AVATAR_CELL_WIDTH * 9;
 export const AVATAR_SHEET_HEIGHT = AVATAR_CELL_HEIGHT;
 export const AVATAR_LAYER_SIZE = 64;
-export const AVATAR_LAYER_CAPACITY = 72;
+export const AVATAR_LAYER_CAPACITY = 108;
 export const AVATAR_GHOST_ALPHA = 0.45;
 export const AVATAR_LAYERS_PER_SHEET = 9;
 
@@ -114,8 +114,35 @@ export function packAvatarSheet(atlas, appearance, rgba, transparent) {
 export function replaceAvatarSheetInAtlas(atlas, appearance, rgba, transparent = null) {
   if (!atlas || !appearance || !rgba) return false;
   if (rgba.length !== AVATAR_SHEET_WIDTH * AVATAR_SHEET_HEIGHT * 4) return false;
-  const entry = atlas.layers?.get(appearance);
-  if (!entry) return false;
+  let entry = atlas.layers?.get(appearance);
+  if (!entry) {
+    const isFinalized = atlas.solidLayerCount > 0;
+    const solidOffset = isFinalized ? atlas.solidLayerCount : atlas.layerCount;
+    const requiredCapacity = isFinalized
+      ? (solidOffset + AVATAR_LAYERS_PER_SHEET) * 2
+      : solidOffset + AVATAR_LAYERS_PER_SHEET;
+    if (requiredCapacity > AVATAR_LAYER_CAPACITY) return false;
+
+    const layerBytes = AVATAR_LAYER_SIZE * AVATAR_LAYER_SIZE * 4;
+    if (isFinalized) {
+      // Shift existing ghost layers forward by one sheet (9 layers) to keep
+      // solid layers [0 .. nextSolid-1] and ghost layers [nextSolid .. 2*nextSolid-1] contiguous.
+      const nextSolid = solidOffset + AVATAR_LAYERS_PER_SHEET;
+      const oldGhostBytes = atlas.pixels.slice(
+        atlas.ghostOffset * layerBytes,
+        (atlas.ghostOffset + solidOffset) * layerBytes,
+      );
+      atlas.pixels.fill(0, solidOffset * layerBytes, nextSolid * 2 * layerBytes);
+      atlas.pixels.set(oldGhostBytes, nextSolid * layerBytes);
+      atlas.solidLayerCount = nextSolid;
+      atlas.ghostOffset = nextSolid;
+      atlas.layerCount = nextSolid * 2;
+    } else {
+      atlas.layerCount = solidOffset + AVATAR_LAYERS_PER_SHEET;
+    }
+    entry = { offset: solidOffset, frames: AVATAR_LAYERS_PER_SHEET };
+    atlas.layers.set(appearance, entry);
+  }
 
   const layerBytes = AVATAR_LAYER_SIZE * AVATAR_LAYER_SIZE * 4;
   for (let frame = 0; frame < AVATAR_LAYERS_PER_SHEET; frame++) {
@@ -145,9 +172,15 @@ export function replaceAvatarSheetInAtlas(atlas, appearance, rgba, transparent =
   return true;
 }
 
-export function avatarLayerFor(atlas, appearance, frame) {
+export function playerAppearanceKey(playerId, appearance) {
+  if (!playerId || !appearance) return appearance;
+  return `${appearance}@${playerId}`;
+}
+
+export function avatarLayerFor(atlas, appearance, frame, playerId = null) {
   if (!atlas || !appearance) return -1;
-  const sheet = atlas.layers.get(appearance);
+  const sheet = (playerId ? atlas.layers.get(playerAppearanceKey(playerId, appearance)) : null)
+    ?? atlas.layers.get(appearance);
   if (!sheet) return -1;
   const index = Number.isFinite(frame) ? Math.max(0, Math.min(sheet.frames - 1, Math.round(frame))) : 0;
   return sheet.offset + index;
