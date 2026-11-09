@@ -111,7 +111,7 @@ export function packAvatarSheet(atlas, appearance, rgba, transparent) {
   return offset;
 }
 
-export function replaceAvatarSheetInAtlas(atlas, appearance, rgba, transparent = [0, 0, 0]) {
+export function replaceAvatarSheetInAtlas(atlas, appearance, rgba, transparent = null) {
   if (!atlas || !appearance || !rgba) return false;
   if (rgba.length !== AVATAR_SHEET_WIDTH * AVATAR_SHEET_HEIGHT * 4) return false;
   const entry = atlas.layers?.get(appearance);
@@ -125,7 +125,7 @@ export function replaceAvatarSheetInAtlas(atlas, appearance, rgba, transparent =
       for (let x = 0; x < AVATAR_CELL_WIDTH; x++) {
         const src = (y * AVATAR_SHEET_WIDTH + frame * AVATAR_CELL_WIDTH + x) * 4;
         const dst = layerBase + (y * AVATAR_LAYER_SIZE + x) * 4;
-        if (keyedOut(rgba, src, transparent)) continue;
+        if (rgba[src + 3] === 0 || (transparent && keyedOut(rgba, src, transparent))) continue;
         atlas.pixels[dst] = rgba[src];
         atlas.pixels[dst + 1] = rgba[src + 1];
         atlas.pixels[dst + 2] = rgba[src + 2];

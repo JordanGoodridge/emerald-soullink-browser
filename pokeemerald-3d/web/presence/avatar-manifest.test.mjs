@@ -11,7 +11,9 @@ import {
   finalizeAvatarAtlas,
   ghostLayerFor,
   packAvatarSheet,
+  replaceAvatarSheetInAtlas,
 } from './avatar-manifest.mjs';
+import { compileCharacterCustomization } from '../customization/character-compositor.mjs';
 
 const KEY = [115, 197, 164];
 
@@ -91,4 +93,43 @@ test('finalize doubles the atlas into translucent ghost layers', async () => {
 
   finalizeAvatarAtlas(atlas);
   assert.equal(atlas.layerCount, 18);
+});
+
+test('replaceAvatarSheetInAtlas preserves black outline pixels (palette index 15 = [0, 0, 0])', () => {
+  const atlas = createAvatarAtlas();
+  packAvatarSheet(atlas, 'brendan.on-foot', syntheticSheet(), KEY);
+  finalizeAvatarAtlas(atlas);
+
+  const compiled = compileCharacterCustomization({}, { gameId: 'emerald' });
+  const replaced = replaceAvatarSheetInAtlas(atlas, 'brendan.on-foot', compiled.walkingRgba);
+  assert.equal(replaced, true);
+
+  // Verify every pixel with alpha=255 in compiled.walkingRgba (including [0, 0, 0] outlines)
+  // is preserved with alpha=255 in the packed atlas layers and translucent in ghost layers.
+  const layerBytes = AVATAR_LAYER_SIZE * AVATAR_LAYER_SIZE * 4;
+  let blackOutlineCount = 0;
+  for (let frame = 0; frame < AVATAR_LAYERS_PER_SHEET; frame++) {
+    const layerBase = frame * layerBytes;
+    const ghostBase = (atlas.ghostOffset + frame) * layerBytes;
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 16; x++) {
+        const src = (y * AVATAR_SHEET_WIDTH + frame * 16 + x) * 4;
+        const dst = layerBase + (y * AVATAR_LAYER_SIZE + x) * 4;
+        const ghostDst = ghostBase + (y * AVATAR_LAYER_SIZE + x) * 4;
+        const expectedAlpha = compiled.walkingRgba[src + 3];
+        assert.equal(atlas.pixels[dst + 3], expectedAlpha, `frame ${frame} (${x},${y}) alpha mismatch`);
+        if (expectedAlpha === 255
+            && compiled.walkingRgba[src] === 0
+            && compiled.walkingRgba[src + 1] === 0
+            && compiled.walkingRgba[src + 2] === 0) {
+          blackOutlineCount++;
+          assert.equal(atlas.pixels[dst], 0);
+          assert.equal(atlas.pixels[dst + 1], 0);
+          assert.equal(atlas.pixels[dst + 2], 0);
+          assert.ok(atlas.pixels[ghostDst + 3] > 0 && atlas.pixels[ghostDst + 3] < 255);
+        }
+      }
+    }
+  }
+  assert.ok(blackOutlineCount > 0, 'expected compiled sheet to contain black [0, 0, 0] outline pixels');
 });
